@@ -318,7 +318,7 @@
     <div class="topbar">
       <div>
         <h1 id="pageTitle">Dashboard</h1>
-        <div class="muted">Netlify Frontend · Apps Script API · Google Sheet เดิม</div>
+        <div class="muted">Netlify Frontend · Fast API v1.2 · Google Sheet เดิม</div>
       </div>
       <button class="btn ghost" onclick="refreshAll()">รีเฟรช</button>
     </div>
@@ -862,6 +862,102 @@ async function server(fn, ...args) {
   return payload.data;
 }
 
+
+function backgroundSync(label, task) {
+  Promise.resolve()
+    .then(task)
+    .catch(err => {
+      console.warn(`Background sync failed: ${label}`, err);
+    });
+}
+
+async function refreshDashboardBackground() {
+  const dashboard = await server('getDashboardData');
+  state.dashboard = dashboard;
+  renderDashboard();
+}
+
+async function refreshTasksBackground({detailTaskId = ''} = {}) {
+  const jobs = [server('getTasks')];
+  if (detailTaskId) jobs.push(server('getTaskDetail', detailTaskId));
+
+  const results = await Promise.all(jobs);
+  state.tasks = results[0] || [];
+  state.tasksLoaded = true;
+  renderTasks();
+  renderTaskUpdateFilters();
+  renderTaskUpdateList();
+
+  if (detailTaskId && results[1]) {
+    state.selectedTaskDetail = results[1];
+    fillTaskEditor(results[1]);
+  }
+}
+
+async function refreshConsultBackground(date) {
+  const week = getClientWorkWeek(date || todayIso());
+  const data = await server('getConsultData', week);
+  state.consult = data;
+  renderConsult();
+}
+
+async function refreshOtBackground() {
+  const year = Number(document.getElementById('otYear').value);
+  const month = Number(document.getElementById('otMonth').value);
+  state.ot = await server('getOtMonth', year, month);
+  state.otLoaded = true;
+  renderOt();
+}
+
+function markAuditStale() {
+  state.auditLoaded = false;
+}
+
+function recomputeDashboardTargetsClient() {
+  const d = state.dashboard;
+  if (!d || !Array.isArray(d.members)) return;
+
+  const memberMap = new Map(state.members.map(m => [m.name, m]));
+  d.totalCapacity = d.members.reduce((sum, x) => {
+    const m = memberMap.get(x.member);
+    const status = m ? Number(m.workStatus || 0) : Number(x.workStatus || 0);
+    x.workStatus = status;
+    x.statusNote = m ? (m.statusNote || '') : (x.statusNote || '');
+    return sum + status;
+  }, 0);
+
+  d.average = d.totalCapacity > 0 ? Number(d.total || 0) / d.totalCapacity : 0;
+  d.members.forEach(x => {
+    x.targetWorkload = roundClient(d.average * Number(x.workStatus || 0));
+    x.remainingConsult = roundClient(x.targetWorkload - Number(x.workload || 0));
+  });
+  d.members.sort((a, b) => Number(b.remainingConsult || 0) - Number(a.remainingConsult || 0));
+}
+
+function applyConsultToDashboardClient(week, counts) {
+  const d = state.dashboard;
+  if (!d || !d.consultPeriod) return;
+  if (week.startDate !== d.consultPeriod.startDate || week.endDate !== d.consultPeriod.endDate) return;
+
+  const map = new Map((counts || []).map(x => [x.memberName, Number(x.count || 0)]));
+  let totalConsult = 0;
+
+  (d.members || []).forEach(x => {
+    x.consult = map.get(x.member) || 0;
+    x.workload = roundClient(Number(x.other || 0) + Number(x.consult || 0));
+    totalConsult += Number(x.consult || 0);
+  });
+
+  d.consultActual = roundClient(totalConsult);
+  d.total = roundClient(Number(d.otherActual || 0) + d.consultActual);
+  recomputeDashboardTargetsClient();
+}
+
+function roundClient(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+
 async function refreshAll() {
   setLoading(true, 'กำลังโหลดข้อมูล...', 'โหลดเฉพาะข้อมูลที่จำเป็นก่อน เพื่อให้เปิดหน้าเร็วขึ้น');
   try {
@@ -1032,6 +1128,7 @@ function renderMemberStatus() {
   `).join('');
 }
 
+async 
 async function saveMemberStatus(memberId) {
   const statusEl = document.getElementById(`memberStatus_${memberId}`);
   const noteEl = document.getElementById(`memberNote_${memberId}`);
@@ -1041,21 +1138,30 @@ async function saveMemberStatus(memberId) {
     return;
   }
 
-  setLoading(true, 'กำลังบันทึกสถานะสมาชิก...', 'กำลังปรับกำลังรับงานและคำนวณ Dashboard ใหม่');
+  setLoading(true, 'กำลังบันทึกสถานะสมาชิก...', 'บันทึกเฉพาะข้อมูลที่แก้ไข');
   try {
     const res = await server('saveMemberStatus', {
       memberId,
       workStatus,
       statusNote: noteEl.value.trim()
     });
-    state.members = res.members || state.members;
-    state.dashboard = res.dashboard || state.dashboard;
+
+    if (res.member) {
+      const i = state.members.findIndex(m => String(m.id) === String(memberId));
+      if (i >= 0) state.members[i] = {...state.members[i], ...res.member};
+    }
+
+    recomputeDashboardTargetsClient();
     renderMemberStatus();
     renderTaskMembers();
     renderDashboard();
     renderTaskUpdateFilters();
     if (state.selectedTaskDetail) fillTaskEditor(state.selectedTaskDetail);
+
+    markAuditStale();
     toast('บันทึกสถานะสมาชิกสำเร็จ', 'success');
+
+    backgroundSync('dashboard after member status', refreshDashboardBackground);
   } catch (err) {
     toast(err.message, 'error');
   } finally {
@@ -1063,6 +1169,7 @@ async function saveMemberStatus(memberId) {
   }
 }
 
+async 
 async function saveTask() {
   const members = [...document.querySelectorAll('input[name="taskMember"]:checked')].map(x => x.value);
   const payload = {
@@ -1078,17 +1185,15 @@ async function saveTask() {
     members
   };
 
-  setLoading(true, 'กำลังบันทึกงาน...', 'กำลังเพิ่มงานและกระจาย Weight ให้ผู้รับผิดชอบ');
+  setLoading(true, 'กำลังบันทึกงาน...', 'เขียนข้อมูลก่อน แล้วซิงก์ Dashboard เบื้องหลัง');
   try {
-    const res = await server('createTask', payload);
-    state.dashboard = res.dashboard;
-    state.tasks = res.tasks;
-    state.tasksLoaded = true;
+    await server('createTask', payload);
     clearTaskForm();
-    renderDashboard();
-    renderTasks();
-    renderTaskUpdateList();
+    markAuditStale();
     toast('บันทึกงานสำเร็จ', 'success');
+
+    backgroundSync('task list after create', () => refreshTasksBackground());
+    backgroundSync('dashboard after create', refreshDashboardBackground);
   } catch (err) {
     toast(err.message, 'error');
   } finally {
@@ -1126,17 +1231,22 @@ function renderTasks() {
   `).join('');
 }
 
+async 
 async function completeTask(taskId) {
-  setLoading(true, 'กำลังปิดงาน...', 'กำลังอัปเดต Status และคำนวณ Workload ใหม่');
+  setLoading(true, 'กำลังปิดงาน...', 'บันทึก Status ก่อน แล้วซิงก์ Workload เบื้องหลัง');
   try {
-    const res = await server('updateTaskStatus', taskId, 'Complete');
-    state.dashboard = res.dashboard;
-    state.tasks = res.tasks;
-    state.tasksLoaded = true;
-    renderDashboard();
+    await server('updateTaskStatus', taskId, 'Complete');
+
+    const task = state.tasks.find(t => String(t.taskId) === String(taskId));
+    if (task) task.status = 'Complete';
     renderTasks();
     renderTaskUpdateList();
+
+    markAuditStale();
     toast('อัปเดต Status เป็น Complete สำเร็จ', 'success');
+
+    backgroundSync('tasks after complete', () => refreshTasksBackground());
+    backgroundSync('dashboard after complete', refreshDashboardBackground);
   } catch (err) {
     toast(err.message, 'error');
   } finally {
@@ -1320,6 +1430,7 @@ function renderTaskUpdateHistory(updates) {
   }).join('');
 }
 
+async 
 async function saveTaskEdit() {
   if (!state.selectedTaskId) return;
   const members = [...document.querySelectorAll('input[name="editTaskMember"]:checked')].map(x => x.value);
@@ -1344,17 +1455,35 @@ async function saveTaskEdit() {
     }
   };
 
-  setLoading(true, 'กำลังบันทึกการแก้ไข...', 'กำลังอัปเดตงาน ผู้รับผิดชอบ และข้อมูลล่าสุด');
+  setLoading(true, 'กำลังบันทึกการแก้ไข...', 'เขียนงานและผู้รับผิดชอบแบบ batch');
   try {
-    const res = await server('updateTask', payload);
-    state.dashboard = res.dashboard;
-    state.tasks = res.tasks || [];
-    state.selectedTaskDetail = res.detail;
-    renderDashboard();
+    await server('updateTask', payload);
+
+    const task = state.tasks.find(t => String(t.taskId) === String(payload.taskId));
+    if (task) {
+      task.job = payload.job;
+      task.description = payload.description;
+      task.holderName = payload.holder_name;
+      task.startDate = payload.start_date;
+      task.dueDate = payload.due_date;
+      task.deadline = payload.deadline;
+      task.weight = payload.weight;
+      task.status = payload.status;
+      const share = members.length ? payload.weight / members.length : 0;
+      task.members = members.map(member => ({member, shareWeight: share}));
+    }
+
     renderTasks();
     renderTaskUpdateList();
-    fillTaskEditor(res.detail);
-    toast('บันทึกการแก้ไขและ Update ล่าสุดสำเร็จ', 'success');
+    clearLatestUpdateInput();
+    markAuditStale();
+    toast('บันทึกการแก้ไขสำเร็จ', 'success');
+
+    backgroundSync(
+      'task detail after edit',
+      () => refreshTasksBackground({detailTaskId: payload.taskId})
+    );
+    backgroundSync('dashboard after task edit', refreshDashboardBackground);
   } catch (err) {
     toast(err.message, 'error');
   } finally {
@@ -1502,28 +1631,60 @@ async function loadConsultWeekIntoForm() {
   finally { setLoading(false); }
 }
 
+async 
 async function saveConsultWeek() {
   const date = document.getElementById('consultEntryDate').value;
   if (!date) { toast('กรุณาเลือกวันที่ในสัปดาห์', 'error'); return; }
+
   const counts = state.members.map(m => ({
     memberName: m.name,
     count: Number(document.getElementById(`consultCount_${m.id}`).value || 0)
   }));
   if (counts.some(x => x.count < 0 || Math.floor(x.count) !== x.count)) {
-    toast('จำนวน Consult ต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป', 'error'); return;
+    toast('จำนวน Consult ต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป', 'error');
+    return;
   }
+
   const week = getClientWorkWeek(date);
-  setLoading(true, 'กำลังบันทึก Consult...', `กำลังอัปเดตยอดสัปดาห์ ${formatShortDate(week.startDate)} – ${formatShortDate(week.endDate)}`);
+  setLoading(true, 'กำลังบันทึก Consult...', 'บันทึกยอดสัปดาห์โดยไม่อ่าน Dashboard ซ้ำใน request เดียว');
   try {
     const res = await server('saveConsultWeek', {date, counts});
-    state.consult = res.consult;
-    state.dashboard = res.dashboard;
+    const positive = counts.filter(x => Number(x.count) > 0);
+
+    state.consult = {
+      startDate: week.startDate,
+      endDate: week.endDate,
+      memberName: '',
+      entries: positive.map(x => ({
+        consultDate: week.startDate,
+        memberName: x.memberName,
+        count: Number(x.count)
+      })),
+      summary: state.members
+        .map(m => ({
+          member: m.name,
+          count: Number(counts.find(x => x.memberName === m.name)?.count || 0)
+        }))
+        .sort((a,b) => b.count - a.count || a.member.localeCompare(b.member, 'th')),
+      total: positive.reduce((sum, x) => sum + Number(x.count || 0), 0),
+      activeMembers: positive.length
+    };
+
+    applyConsultToDashboardClient(week, counts);
     renderConsult();
     renderDashboard();
-    await loadConsultWeekIntoForm();
+    fillConsultInputsFromSummary(state.consult.summary);
+
+    markAuditStale();
     toast('บันทึกยอด Consult รายสัปดาห์สำเร็จ', 'success');
-  } catch (err) { toast(err.message, 'error'); }
-  finally { setLoading(false); }
+
+    backgroundSync('consult after save', () => refreshConsultBackground(date));
+    backgroundSync('dashboard after consult', refreshDashboardBackground);
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
 }
 
 function getClientWorkWeek(isoDate) {
@@ -1585,6 +1746,7 @@ function renderSubtasks(items) {
   `).join('');
 }
 
+async 
 async function addSubtask() {
   if (!state.selectedTaskId) return;
   const payload = {
@@ -1595,21 +1757,42 @@ async function addSubtask() {
     status: document.getElementById('newSubtaskStatus').value
   };
   if (!payload.title) { toast('กรุณาใส่ชื่อ Subtask', 'error'); return; }
-  setLoading(true, 'กำลังเพิ่ม Subtask...', 'กำลังบันทึกงานย่อย');
+
+  setLoading(true, 'กำลังเพิ่ม Subtask...', 'บันทึกงานย่อยก่อน แล้วซิงก์รายการเบื้องหลัง');
   try {
     const res = await server('addSubtask', payload);
-    state.tasks = res.tasks || state.tasks;
-    state.tasksLoaded = true;
-    state.selectedTaskDetail = res.detail;
-    renderTasks(); renderTaskUpdateList(); fillTaskEditor(res.detail);
+    if (res.subtask && state.selectedTaskDetail) {
+      state.selectedTaskDetail.subtasks = [
+        ...(state.selectedTaskDetail.subtasks || []),
+        res.subtask
+      ];
+      renderSubtasks(state.selectedTaskDetail.subtasks);
+    }
+
+    document.getElementById('newSubtaskTitle').value = '';
+    document.getElementById('newSubtaskDescription').value = '';
+    document.getElementById('newSubtaskDue').value = '';
+
+    markAuditStale();
     toast('เพิ่ม Subtask สำเร็จ', 'success');
-  } catch (err) { toast(err.message, 'error'); }
-  finally { setLoading(false); }
+
+    backgroundSync(
+      'subtask after add',
+      () => refreshTasksBackground({detailTaskId: state.selectedTaskId})
+    );
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
 }
 
+async 
 async function saveSubtask(subtaskId) {
-  const row = [...document.querySelectorAll('.subtask-row')].find(x => x.dataset.subtaskId === subtaskId);
+  const row = [...document.querySelectorAll('.subtask-row')]
+    .find(x => x.dataset.subtaskId === subtaskId);
   if (!row) return;
+
   const payload = {
     subtaskId,
     title: row.querySelector('.sub-title').value.trim(),
@@ -1617,30 +1800,58 @@ async function saveSubtask(subtaskId) {
     dueDate: row.querySelector('.sub-due').value,
     status: row.querySelector('.sub-status').value
   };
-  setLoading(true, 'กำลังบันทึก Subtask...', 'กำลังอัปเดตสถานะและรายละเอียดงานย่อย');
+
+  setLoading(true, 'กำลังบันทึก Subtask...', 'เขียนเฉพาะแถวที่แก้ไข');
   try {
     const res = await server('updateSubtask', payload);
-    state.tasks = res.tasks || state.tasks;
-    state.tasksLoaded = true;
-    state.selectedTaskDetail = res.detail;
-    renderTasks(); renderTaskUpdateList(); fillTaskEditor(res.detail);
+
+    if (res.subtask && state.selectedTaskDetail) {
+      const i = (state.selectedTaskDetail.subtasks || [])
+        .findIndex(x => String(x.subtaskId) === String(subtaskId));
+      if (i >= 0) state.selectedTaskDetail.subtasks[i] = res.subtask;
+      renderSubtasks(state.selectedTaskDetail.subtasks || []);
+    }
+
+    markAuditStale();
     toast('บันทึก Subtask สำเร็จ', 'success');
-  } catch (err) { toast(err.message, 'error'); }
-  finally { setLoading(false); }
+
+    backgroundSync(
+      'subtask after update',
+      () => refreshTasksBackground({detailTaskId: state.selectedTaskId})
+    );
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
 }
 
+async 
 async function removeSubtask(subtaskId) {
   if (!confirm('ลบ Subtask นี้?')) return;
-  setLoading(true, 'กำลังลบ Subtask...', 'กำลังอัปเดตรายการงานย่อย');
+
+  setLoading(true, 'กำลังลบ Subtask...', 'ลบรายการก่อน แล้วซิงก์จำนวนงานย่อยเบื้องหลัง');
   try {
-    const res = await server('deleteSubtask', subtaskId);
-    state.tasks = res.tasks || state.tasks;
-    state.tasksLoaded = true;
-    state.selectedTaskDetail = res.detail;
-    renderTasks(); renderTaskUpdateList(); fillTaskEditor(res.detail);
+    await server('deleteSubtask', subtaskId);
+
+    if (state.selectedTaskDetail) {
+      state.selectedTaskDetail.subtasks = (state.selectedTaskDetail.subtasks || [])
+        .filter(x => String(x.subtaskId) !== String(subtaskId));
+      renderSubtasks(state.selectedTaskDetail.subtasks);
+    }
+
+    markAuditStale();
     toast('ลบ Subtask สำเร็จ', 'success');
-  } catch (err) { toast(err.message, 'error'); }
-  finally { setLoading(false); }
+
+    backgroundSync(
+      'subtask after delete',
+      () => refreshTasksBackground({detailTaskId: state.selectedTaskId})
+    );
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function generateOtMonth() {
@@ -1932,6 +2143,7 @@ function copyShiftToSelected(onlySelected=true) {
   });
 }
 
+async 
 async function saveOtDay() {
   if (!state.selectedDate) return;
 
@@ -1970,14 +2182,18 @@ async function saveOtDay() {
     entries
   };
 
-  setLoading(true, 'กำลังบันทึก OT...', `กำลังบันทึก ${formatDateLabel(state.selectedDate)} · ${entries.length} คน`);
+  setLoading(true, 'กำลังบันทึก OT...', `บันทึก ${formatDateLabel(state.selectedDate)} · ${entries.length} คน`);
   try {
-    const res = await server('saveOtDay', payload);
-    state.ot = res.monthData;
-    state.otLoaded = true;
+    await server('saveOtDay', payload);
     state.otAdvanced = false;
-    renderOt();
-    toast(active ? `บันทึก OT สำเร็จ ${entries.length} คน` : 'บันทึกว่าไม่ทำ OT วันนี้แล้ว', 'success');
+    markAuditStale();
+    toast(
+      active ? `บันทึก OT สำเร็จ ${entries.length} คน` : 'บันทึกว่าไม่ทำ OT วันนี้แล้ว',
+      'success'
+    );
+
+    // Do not keep the user waiting for a full month reread.
+    backgroundSync('OT month after save', refreshOtBackground);
   } catch (err) {
     toast(err.message, 'error');
   } finally {

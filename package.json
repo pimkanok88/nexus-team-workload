@@ -1,8 +1,8 @@
 {
   "name": "team-workload-netlify-apps-script",
   "private": true,
-  "version": "1.0.0",
-  "description": "Netlify frontend + Apps Script API + existing Google Sheet",
+  "version": "1.2.0",
+  "description": "Netlify frontend + Apps Script Fast API v1.2 + existing Google Sheet",
   "type": "module",
   "scripts": {
     "dev": "npx netlify-cli dev",

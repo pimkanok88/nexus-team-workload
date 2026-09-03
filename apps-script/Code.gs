@@ -1,5 +1,5 @@
 /**
- * Team Workload + OT Web App v5.4 Performance
+ * Team Workload + OT API v1.2 Fast API (Netlify frontend)
  * Weekly Consult workload + Subtasks + member capacity/status + workload-adjusted target.
  * NEW SYSTEM - standalone Apps Script.
  * Does not read or depend on any old spreadsheet.
@@ -66,6 +66,16 @@ const HEADERS = {
     'record_id', 'before_json', 'after_json'
   ],
   BackupLog: ['backup_id', 'timestamp', 'google_copy_name', 'xlsx_name', 'status', 'message']
+};
+
+
+const CACHE = {
+  MEMBERS: 'tw_members_v12',
+  SETTINGS: 'tw_settings_v12',
+  DASHBOARD: 'tw_dashboard_v12',
+  MEMBERS_TTL: 300,
+  SETTINGS_TTL: 600,
+  DASHBOARD_TTL: 20
 };
 
 /* =========================
@@ -313,6 +323,10 @@ function apiCall(fn, args) {
   switch (String(fn || '')) {
     case 'getBootstrapData':
       return getBootstrapData();
+    case 'getDashboardData':
+      return getDashboardData();
+    case 'getMembers':
+      return getMembers_();
     case 'getTasks':
       return getTasks();
     case 'getAuditLogs':
@@ -350,15 +364,21 @@ function apiCall(fn, args) {
   }
 }
 
+
 function getBootstrapData() {
-  // PERFORMANCE: normal page load is read-only and only reads the five sheets
-  // required by Dashboard / Members / Consult. Heavy pages (Tasks detail,
-  // OT and Audit) are loaded lazily when the user opens them.
-  const core = readCoreData_();
+  // FAST API: Members/Settings are cached; heavy pages remain lazy.
+  const members = getMembers_();
+  const settings = getSettings_();
+  const tasks = getSheetObjects_(APP.SHEETS.TASKS);
+  const taskMembers = getSheetObjects_(APP.SHEETS.TASK_MEMBERS);
+  const consultRows = getSheetObjects_(APP.SHEETS.CONSULT);
   const now = new Date();
   const consultRange = currentWorkWeekRange_();
-  const members = membersFromRows_(core.members);
-  const settings = settingsFromRows_(core.settings);
+
+  const dashboard = buildDashboardData_(
+    members, settings, tasks, taskMembers, consultRows, consultRange
+  );
+  putCacheJson_(CACHE.DASHBOARD, dashboard, CACHE.DASHBOARD_TTL);
 
   return {
     appName: settings.APP_NAME || 'Team Workload & OT',
@@ -366,12 +386,12 @@ function getBootstrapData() {
     settings,
     currentYear: Number(Utilities.formatDate(now, APP.TZ, 'yyyy')),
     currentMonth: Number(Utilities.formatDate(now, APP.TZ, 'M')),
-    dashboard: buildDashboardData_(members, settings, core.tasks, core.taskMembers, core.consult, consultRange),
-    consult: buildConsultData_(consultRange, members, core.consult),
-    // These pages are intentionally lazy-loaded by Index.html.
+    dashboard,
+    consult: buildConsultData_(consultRange, members, consultRows),
     tasks: [],
     audit: [],
-    lazy: { tasks: true, ot: true, audit: true }
+    lazy: { tasks: true, ot: true, audit: true },
+    apiVersion: '1.2-fast'
   };
 }
 
@@ -566,6 +586,7 @@ function ensureMemberStatusSchema_() {
   sh.getRange(2, statusCol, Math.max(1, lastRow - 1), 1).setDataValidation(rule);
 }
 
+
 function saveMemberStatus(payload) {
   if (!payload || !payload.memberId) throw new Error('กรุณาระบุสมาชิก');
   const workStatus = Number(payload.workStatus);
@@ -577,7 +598,9 @@ function saveMemberStatus(payload) {
   lock.waitLock(30000);
   try {
     const sh = getDb_().getSheetByName(APP.SHEETS.MEMBERS);
-    const values = sh.getDataRange().getValues();
+    const lastRow = sh.getLastRow();
+    const lastCol = sh.getLastColumn();
+    const values = sh.getRange(1, 1, lastRow, lastCol).getValues();
     const headers = values[0].map(String);
     const idx = headerIndex_(headers);
 
@@ -585,14 +608,14 @@ function saveMemberStatus(payload) {
       if (String(values[i][idx.member_id]) !== String(payload.memberId)) continue;
 
       const before = rowToObject_(headers, values[i]);
-      const rowNum = i + 1;
       const note = String(payload.statusNote || '').trim() || defaultMemberStatusNote_(workStatus);
       const now = nowString_();
 
       values[i][idx.work_status] = workStatus;
       values[i][idx.status_note] = note;
       values[i][idx.status_updated_at] = now;
-      sh.getRange(rowNum, 1, 1, headers.length).setValues([values[i].slice(0, headers.length)]);
+      sh.getRange(i + 1, 1, 1, headers.length)
+        .setValues([values[i].slice(0, headers.length)]);
 
       appendAudit_('UPDATE_STATUS', 'MEMBER', payload.memberId, before, {
         member_id: payload.memberId,
@@ -601,10 +624,18 @@ function saveMemberStatus(payload) {
         status_updated_at: now
       });
 
+      invalidateMembersCache_();
+      invalidateDashboardCache_();
+
       return {
         ok: true,
-        members: getMembers_(),
-        dashboard: getDashboardData()
+        member: {
+          id: String(payload.memberId),
+          name: String(values[i][idx.name] || ''),
+          workStatus,
+          statusNote: note,
+          statusUpdatedAt: now
+        }
       };
     }
     throw new Error('ไม่พบสมาชิก: ' + payload.memberId);
@@ -623,13 +654,22 @@ function defaultMemberStatusNote_(workStatus) {
    PAGE 1: WORKLOAD
 ========================= */
 
+
 function getDashboardData() {
+  const cached = getCacheJson_(CACHE.DASHBOARD);
+  if (cached) return cached;
+
   const members = getMembers_();
   const settings = getSettings_();
   const tasks = getSheetObjects_(APP.SHEETS.TASKS);
   const taskMembers = getSheetObjects_(APP.SHEETS.TASK_MEMBERS);
   const consultRows = getSheetObjects_(APP.SHEETS.CONSULT);
-  return buildDashboardData_(members, settings, tasks, taskMembers, consultRows, currentWorkWeekRange_());
+
+  const dashboard = buildDashboardData_(
+    members, settings, tasks, taskMembers, consultRows, currentWorkWeekRange_()
+  );
+  putCacheJson_(CACHE.DASHBOARD, dashboard, CACHE.DASHBOARD_TTL);
+  return dashboard;
 }
 
 function buildDashboardData_(members, settings, tasks, taskMembers, consultRows, consultRange) {
@@ -711,6 +751,7 @@ function buildDashboardData_(members, settings, tasks, taskMembers, consultRows,
   };
 }
 
+
 function createTask(payload) {
   validateTask_(payload);
   const lock = LockService.getScriptLock();
@@ -720,11 +761,11 @@ function createTask(payload) {
     const now = nowString_();
     const user = getUser_();
     const taskId = makeId_('TSK');
-    const members = [...new Set((payload.members || []).map(String))];
+    const members = [...new Set((payload.members || []).map(String).filter(Boolean))];
     const weight = num_(payload.weight);
     const share = members.length ? weight / members.length : 0;
 
-    const taskRow = [
+    appendRow_(APP.SHEETS.TASKS, [
       taskId,
       String(payload.category || 'Other').toLowerCase() === 'consult' ? 'Other' : (payload.category || 'Other'),
       payload.job || '',
@@ -738,21 +779,19 @@ function createTask(payload) {
       now,
       user,
       now
-    ];
-
-    appendRow_(APP.SHEETS.TASKS, taskRow);
+    ]);
 
     appendRows_(APP.SHEETS.TASK_MEMBERS, members.map((member) => [
       taskId, member, round4_(share)
     ]));
 
     appendAudit_('CREATE', 'TASK', taskId, null, payload);
+    invalidateDashboardCache_();
 
     return {
       ok: true,
       taskId,
-      dashboard: getDashboardData(),
-      tasks: getTasks()
+      savedAt: now
     };
   } finally {
     lock.releaseLock();
@@ -862,6 +901,7 @@ function getTaskUpdateHistory(taskId) {
     .sort(compareTaskUpdatesDesc_);
 }
 
+
 function updateTask(payload) {
   if (!payload || !payload.taskId) throw new Error('กรุณาระบุงาน');
   validateTask_(payload);
@@ -872,20 +912,20 @@ function updateTask(payload) {
   try {
     const ss = getDb_();
     const taskSh = ss.getSheetByName(APP.SHEETS.TASKS);
-    const values = taskSh.getDataRange().getValues();
-    if (!values.length) throw new Error('ไม่พบข้อมูล Tasks');
-
+    const lastRow = taskSh.getLastRow();
+    const lastCol = taskSh.getLastColumn();
+    const values = taskSh.getRange(1, 1, lastRow, lastCol).getValues();
     const headers = values[0].map(String);
     const idx = headerIndex_(headers);
+
     const rowIndex = values.findIndex((row, i) =>
       i > 0 && String(row[idx.task_id]) === String(payload.taskId)
     );
-
     if (rowIndex < 1) throw new Error('ไม่พบ task_id: ' + payload.taskId);
 
-    const rowNum = rowIndex + 1;
     const beforeTask = rowToObject_(headers, values[rowIndex]);
     const now = nowString_();
+    const row = values[rowIndex].slice(0, headers.length);
 
     const updates = {
       category: String(payload.category || 'Other').toLowerCase() === 'consult' ? 'Other' : (payload.category || 'Other'),
@@ -901,48 +941,56 @@ function updateTask(payload) {
     };
 
     Object.entries(updates).forEach(([field, value]) => {
-      if (idx[field] !== undefined) {
-        taskSh.getRange(rowNum, idx[field] + 1).setValue(value);
-      }
+      if (idx[field] !== undefined) row[idx[field]] = value;
     });
+    taskSh.getRange(rowIndex + 1, 1, 1, headers.length).setValues([row]);
 
-    // Replace current assignees for this task.
+    // Replace assignees in ONE batch rewrite (no deleteRow()/appendRow() loop).
     const tmSh = ss.getSheetByName(APP.SHEETS.TASK_MEMBERS);
-    const tmValues = tmSh.getDataRange().getValues();
+    const tmLastRow = tmSh.getLastRow();
+    const tmLastCol = tmSh.getLastColumn();
+    const tmValues = tmSh.getRange(1, 1, Math.max(1, tmLastRow), tmLastCol).getValues();
     const tmHeaders = tmValues[0].map(String);
     const tmIdx = headerIndex_(tmHeaders);
 
-    for (let i = tmValues.length - 1; i >= 1; i--) {
-      if (String(tmValues[i][tmIdx.task_id]) === String(payload.taskId)) {
-        tmSh.deleteRow(i + 1);
-      }
-    }
+    const kept = tmValues.slice(1)
+      .filter(r => r.some(v => v !== ''))
+      .filter(r => String(r[tmIdx.task_id]) !== String(payload.taskId))
+      .map(r => r.slice(0, tmHeaders.length));
 
     const members = [...new Set((payload.members || []).map(String).filter(Boolean))];
     const share = members.length ? num_(payload.weight) / members.length : 0;
-    members.forEach((member) => {
-      tmSh.appendRow([
-        payload.taskId,
-        member,
-        round4_(share)
-      ]);
+    const replacement = members.map(member => {
+      const r = Array(tmHeaders.length).fill('');
+      r[tmIdx.task_id] = payload.taskId;
+      r[tmIdx.member_name] = member;
+      r[tmIdx.share_weight] = round4_(share);
+      return r;
     });
+
+    const output = kept.concat(replacement);
+    const existingTmRows = Math.max(0, tmSh.getLastRow() - 1);
+    if (existingTmRows > 0) {
+      tmSh.getRange(2, 1, existingTmRows, tmHeaders.length).clearContent();
+    }
+    if (output.length) {
+      tmSh.getRange(2, 1, output.length, tmHeaders.length).setValues(output);
+    }
 
     const afterTask = {
       ...updates,
       task_id: payload.taskId,
-      members: members
+      members
     };
-
     appendAudit_('UPDATE', 'TASK', payload.taskId, beforeTask, afterTask);
 
-    // Optional latest-update note. Existing TaskUpdates schema is reused.
     const latestUpdate = payload.latestUpdate || {};
     const hasProgress = latestUpdate.progress !== '' &&
       latestUpdate.progress !== null &&
       latestUpdate.progress !== undefined;
     const hasNote = String(latestUpdate.note || '').trim() !== '';
 
+    let updateAdded = false;
     if (hasProgress || hasNote) {
       addTaskUpdate_({
         taskId: payload.taskId,
@@ -951,42 +999,60 @@ function updateTask(payload) {
         progress: hasProgress ? latestUpdate.progress : '',
         note: latestUpdate.note || ''
       });
+      updateAdded = true;
     }
+
+    invalidateDashboardCache_();
 
     return {
       ok: true,
-      dashboard: getDashboardData(),
-      tasks: getTasks(),
-      detail: getTaskDetail(payload.taskId)
+      taskId: String(payload.taskId),
+      savedAt: now,
+      updateAdded
     };
   } finally {
     lock.releaseLock();
   }
 }
 
-function updateTaskStatus(taskId, newStatus) {
-  const sh = getDb_().getSheetByName(APP.SHEETS.TASKS);
-  const values = sh.getDataRange().getValues();
-  const headers = values[0];
-  const idxTask = headers.indexOf('task_id');
-  const idxStatus = headers.indexOf('status');
-  const idxUpdated = headers.indexOf('updated_at');
 
-  for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idxTask]) === String(taskId)) {
-      const before = { status: values[i][idxStatus] };
-      sh.getRange(i + 1, idxStatus + 1).setValue(newStatus);
-      sh.getRange(i + 1, idxUpdated + 1).setValue(nowString_());
+function updateTaskStatus(taskId, newStatus) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sh = getDb_().getSheetByName(APP.SHEETS.TASKS);
+    const lastRow = sh.getLastRow();
+    const lastCol = sh.getLastColumn();
+    const values = sh.getRange(1, 1, lastRow, lastCol).getValues();
+    const headers = values[0].map(String);
+    const idx = headerIndex_(headers);
+
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][idx.task_id]) !== String(taskId)) continue;
+
+      const before = { status: values[i][idx.status] };
+      const now = nowString_();
+      const row = values[i].slice(0, headers.length);
+      row[idx.status] = newStatus;
+      row[idx.updated_at] = now;
+
+      sh.getRange(i + 1, 1, 1, headers.length).setValues([row]);
       appendAudit_('UPDATE_STATUS', 'TASK', taskId, before, { status: newStatus });
+      invalidateDashboardCache_();
+
       return {
         ok: true,
-        dashboard: getDashboardData(),
-        tasks: getTasks()
+        taskId: String(taskId),
+        status: String(newStatus),
+        savedAt: now
       };
     }
+    throw new Error('ไม่พบ task_id: ' + taskId);
+  } finally {
+    lock.releaseLock();
   }
-  throw new Error('ไม่พบ task_id: ' + taskId);
 }
+
 
 
 function addTaskUpdate(payload) {
@@ -996,12 +1062,7 @@ function addTaskUpdate(payload) {
   lock.waitLock(30000);
   try {
     const update = addTaskUpdate_(payload);
-    return {
-      ok: true,
-      update,
-      tasks: getTasks(),
-      detail: getTaskDetail(payload.taskId)
-    };
+    return { ok: true, update };
   } finally {
     lock.releaseLock();
   }
@@ -1099,6 +1160,7 @@ function getSubtasks(taskId) {
     });
 }
 
+
 function addSubtask(payload) {
   if (!payload || !payload.taskId) throw new Error('กรุณาระบุ Task');
   if (!String(payload.title || '').trim()) throw new Error('กรุณาระบุชื่อ Subtask');
@@ -1106,36 +1168,56 @@ function addSubtask(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    const current = getSubtasks(payload.taskId);
-    const nextOrder = current.length
-      ? Math.max.apply(null, current.map((x) => num_(x.sortOrder))) + 1
-      : 1;
+    const sh = getDb_().getSheetByName(APP.SHEETS.SUBTASKS);
+    const lastRow = sh.getLastRow();
+    const lastCol = sh.getLastColumn();
+    const values = lastRow >= 1
+      ? sh.getRange(1, 1, lastRow, lastCol).getValues()
+      : [HEADERS.Subtasks];
+    const headers = values[0].map(String);
+    const idx = headerIndex_(headers);
+
+    let nextOrder = 1;
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][idx.task_id]) !== String(payload.taskId)) continue;
+      nextOrder = Math.max(nextOrder, num_(values[i][idx.sort_order]) + 1);
+    }
+
     const now = nowString_();
     const subtaskId = makeId_('SUB');
+    const subtask = {
+      subtaskId,
+      taskId: String(payload.taskId),
+      title: String(payload.title || '').trim(),
+      description: String(payload.description || '').trim(),
+      dueDate: payload.dueDate || '',
+      status: payload.status || 'not start',
+      sortOrder: nextOrder,
+      createdAt: now,
+      createdBy: getUser_(),
+      updatedAt: now
+    };
 
     appendRow_(APP.SHEETS.SUBTASKS, [
-      subtaskId,
-      payload.taskId,
-      String(payload.title || '').trim(),
-      String(payload.description || '').trim(),
-      payload.dueDate || '',
-      payload.status || 'not start',
-      nextOrder,
-      now,
-      getUser_(),
-      now
+      subtask.subtaskId,
+      subtask.taskId,
+      subtask.title,
+      subtask.description,
+      subtask.dueDate,
+      subtask.status,
+      subtask.sortOrder,
+      subtask.createdAt,
+      subtask.createdBy,
+      subtask.updatedAt
     ]);
 
     appendAudit_('CREATE', 'SUBTASK', subtaskId, null, payload);
-    return {
-      ok: true,
-      detail: getTaskDetail(payload.taskId),
-      tasks: getTasks()
-    };
+    return { ok: true, subtask };
   } finally {
     lock.releaseLock();
   }
 }
+
 
 function updateSubtask(payload) {
   if (!payload || !payload.subtaskId) throw new Error('กรุณาระบุ Subtask');
@@ -1145,29 +1227,34 @@ function updateSubtask(payload) {
   lock.waitLock(30000);
   try {
     const sh = getDb_().getSheetByName(APP.SHEETS.SUBTASKS);
-    const values = sh.getDataRange().getValues();
+    const lastRow = sh.getLastRow();
+    const lastCol = sh.getLastColumn();
+    const values = sh.getRange(1, 1, lastRow, lastCol).getValues();
     const headers = values[0].map(String);
     const idx = headerIndex_(headers);
 
     for (let i = 1; i < values.length; i++) {
       if (String(values[i][idx.subtask_id]) !== String(payload.subtaskId)) continue;
+
       const before = rowToObject_(headers, values[i]);
-      const rowNum = i + 1;
-      const updates = {
-        title: String(payload.title || '').trim(),
-        description: String(payload.description || '').trim(),
-        due_date: payload.dueDate || '',
-        status: payload.status || 'not start',
-        updated_at: nowString_()
-      };
-      Object.entries(updates).forEach(([field, value]) => {
-        sh.getRange(rowNum, idx[field] + 1).setValue(value);
-      });
-      appendAudit_('UPDATE', 'SUBTASK', payload.subtaskId, before, updates);
+      const now = nowString_();
+      const row = values[i].slice(0, headers.length);
+
+      row[idx.title] = String(payload.title || '').trim();
+      row[idx.description] = String(payload.description || '').trim();
+      row[idx.due_date] = payload.dueDate || '';
+      row[idx.status] = payload.status || 'not start';
+      row[idx.updated_at] = now;
+
+      sh.getRange(i + 1, 1, 1, headers.length).setValues([row]);
+
+      const subtask = normalizeSubtask_(rowToObject_(headers, row));
+      appendAudit_('UPDATE', 'SUBTASK', payload.subtaskId, before, subtask);
+
       return {
         ok: true,
-        detail: getTaskDetail(before.task_id),
-        tasks: getTasks()
+        taskId: String(before.task_id || ''),
+        subtask
       };
     }
     throw new Error('ไม่พบ Subtask: ' + payload.subtaskId);
@@ -1176,25 +1263,31 @@ function updateSubtask(payload) {
   }
 }
 
+
 function deleteSubtask(subtaskId) {
   if (!subtaskId) throw new Error('กรุณาระบุ Subtask');
+
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
     const sh = getDb_().getSheetByName(APP.SHEETS.SUBTASKS);
-    const values = sh.getDataRange().getValues();
+    const lastRow = sh.getLastRow();
+    const lastCol = sh.getLastColumn();
+    const values = sh.getRange(1, 1, lastRow, lastCol).getValues();
     const headers = values[0].map(String);
     const idx = headerIndex_(headers);
 
     for (let i = values.length - 1; i >= 1; i--) {
       if (String(values[i][idx.subtask_id]) !== String(subtaskId)) continue;
+
       const before = rowToObject_(headers, values[i]);
       sh.deleteRow(i + 1);
       appendAudit_('DELETE', 'SUBTASK', subtaskId, before, null);
+
       return {
         ok: true,
-        detail: getTaskDetail(before.task_id),
-        tasks: getTasks()
+        subtaskId: String(subtaskId),
+        taskId: String(before.task_id || '')
       };
     }
     throw new Error('ไม่พบ Subtask: ' + subtaskId);
@@ -1271,6 +1364,7 @@ function buildConsultData_(filters, members, consultRows) {
   };
 }
 
+
 function saveConsultWeek(payload) {
   if (!payload || !/^\d{4}-\d{2}-\d{2}$/.test(String(payload.date || ''))) {
     throw new Error('กรุณาเลือกวันที่ในสัปดาห์ Consult');
@@ -1281,7 +1375,9 @@ function saveConsultWeek(payload) {
   try {
     const range = weekRangeForDate_(String(payload.date));
     const sh = getDb_().getSheetByName(APP.SHEETS.CONSULT);
-    const values = sh.getDataRange().getValues();
+    const lastRow = sh.getLastRow();
+    const lastCol = sh.getLastColumn();
+    const values = sh.getRange(1, 1, Math.max(1, lastRow), lastCol).getValues();
     const headers = values[0].map(String);
     const idx = headerIndex_(headers);
     const before = [];
@@ -1291,7 +1387,7 @@ function saveConsultWeek(payload) {
       const rowDate = dateOnly_(values[i][idx.consult_date]);
       if (dateInRange_(rowDate, range.startDate, range.endDate)) {
         before.push(rowToObject_(headers, values[i]));
-      } else if (values[i].some((v) => v !== '')) {
+      } else if (values[i].some(v => v !== '')) {
         keptRows.push(values[i].slice(0, headers.length));
       }
     }
@@ -1301,24 +1397,22 @@ function saveConsultWeek(payload) {
     const after = [];
     const newRows = [];
 
-    (payload.counts || []).forEach((item) => {
+    (payload.counts || []).forEach(item => {
       const member = String(item.memberName || '').trim();
       const raw = Number(item.count);
       if (!member || !Number.isFinite(raw) || raw <= 0) return;
       if (Math.floor(raw) !== raw) throw new Error('จำนวน Consult ต้องเป็นจำนวนเต็ม');
 
-      const row = [makeId_('CON'), range.startDate, member, raw, '', now, user, now];
-      newRows.push(row);
+      newRows.push([
+        makeId_('CON'), range.startDate, member, raw, '',
+        now, user, now
+      ]);
       after.push({
-        consult_date: range.startDate,
-        week_end: range.endDate,
-        member_name: member,
-        consult_count: raw,
-        workload_weight: raw
+        memberName: member,
+        count: raw
       });
     });
 
-    // Batch replace the selected week instead of deleteRow()/appendRow() repeatedly.
     const outputRows = keptRows.concat(newRows);
     const existingDataRows = Math.max(0, sh.getLastRow() - 1);
     if (existingDataRows > 0) {
@@ -1329,16 +1423,13 @@ function saveConsultWeek(payload) {
     }
 
     appendAudit_('REPLACE_WEEK', 'CONSULT', `${range.startDate}_${range.endDate}`, before, after);
+    invalidateDashboardCache_();
 
-    // Read the post-save core data once and reuse it for both Consult and Dashboard.
-    const core = readCoreData_();
-    const members = membersFromRows_(core.members);
-    const settings = settingsFromRows_(core.settings);
     return {
       ok: true,
       week: range,
-      consult: buildConsultData_(range, members, core.consult),
-      dashboard: buildDashboardData_(members, settings, core.tasks, core.taskMembers, core.consult, currentWorkWeekRange_())
+      counts: after,
+      savedAt: now
     };
   } finally {
     lock.releaseLock();
@@ -1696,6 +1787,7 @@ function saveOtScheduleDay(payload) {
   return { ok: true };
 }
 
+
 function saveOtDay(payload) {
   if (!payload || !payload.date) throw new Error('กรุณาระบุวันที่');
   payload.date = normalizeDateOnly_(payload.date);
@@ -1717,7 +1809,9 @@ function saveOtDay(payload) {
     }
 
     const sh = getDb_().getSheetByName(APP.SHEETS.OT_ENTRIES);
-    const data = sh.getDataRange().getValues();
+    const lastRow = sh.getLastRow();
+    const lastCol = sh.getLastColumn();
+    const data = sh.getRange(1, 1, Math.max(1, lastRow), lastCol).getValues();
     const headers = data[0].map(String);
     const idx = headerIndex_(headers);
 
@@ -1726,7 +1820,7 @@ function saveOtDay(payload) {
     for (let i = 1; i < data.length; i++) {
       if (normalizeDateOnly_(data[i][idx.work_date]) === payload.date) {
         oldRows.push(rowToObject_(headers, data[i]));
-      } else if (data[i].some((v) => v !== '')) {
+      } else if (data[i].some(v => v !== '')) {
         keptRows.push(data[i].slice(0, headers.length));
       }
     }
@@ -1735,25 +1829,41 @@ function saveOtDay(payload) {
     const now = nowString_();
     const user = getUser_();
     const newRows = [];
+    const savedEntries = [];
 
-    (payload.entries || []).forEach((entry) => {
+    (payload.entries || []).forEach(entry => {
       if (!entry.member) return;
       const start = entry.start || '';
       const end = entry.end || '';
       const breakHours = num_(entry.breakHours);
       const hours = calcHours_(start, end, breakHours);
-      const rate = entry.rate !== undefined && entry.rate !== '' ? num_(entry.rate) : rateDefault;
+      const rate = entry.rate !== undefined && entry.rate !== ''
+        ? num_(entry.rate)
+        : rateDefault;
       const amount = round2_(hours * rate);
+      const roles = Array.isArray(entry.roles)
+        ? entry.roles.join(', ')
+        : (entry.roles || '');
 
       newRows.push([
-        makeId_('OTE'), payload.date, entry.member, start, end, breakHours, hours,
-        Array.isArray(entry.roles) ? entry.roles.join(', ') : (entry.roles || ''),
-        rate, amount, entry.note || '', now, user, now
+        makeId_('OTE'), payload.date, entry.member, start, end,
+        breakHours, hours, roles, rate, amount, entry.note || '',
+        now, user, now
       ]);
+
+      savedEntries.push({
+        member: String(entry.member),
+        start,
+        end,
+        breakHours,
+        hours,
+        roles,
+        rate,
+        amount,
+        note: String(entry.note || '')
+      });
     });
 
-    // Replace all OT entry rows in one batch. This is much faster than
-    // deleteRow()/appendRow() for every member.
     const outputRows = keptRows.concat(newRows);
     const existingDataRows = Math.max(0, sh.getLastRow() - 1);
     if (existingDataRows > 0) {
@@ -1765,8 +1875,13 @@ function saveOtDay(payload) {
 
     appendAudit_('REPLACE_DAY', 'OT_ENTRY', payload.date, oldRows, payload.entries || []);
 
-    const [year, month] = payload.date.split('-').map(Number);
-    return { ok: true, monthData: getOtMonth(year, month) };
+    return {
+      ok: true,
+      date: payload.date,
+      savedAt: now,
+      schedule: payload.schedule || null,
+      entries: savedEntries
+    };
   } finally {
     lock.releaseLock();
   }
@@ -1890,9 +2005,14 @@ function getDb_() {
   return DB_HANDLE_CACHE_;
 }
 
+
 function getMembers_() {
-  // Schema upgrades are setup/upgrade work, not normal read work.
-  return membersFromRows_(getSheetObjects_(APP.SHEETS.MEMBERS));
+  const cached = getCacheJson_(CACHE.MEMBERS);
+  if (cached) return cached;
+
+  const members = membersFromRows_(getSheetObjects_(APP.SHEETS.MEMBERS));
+  putCacheJson_(CACHE.MEMBERS, members, CACHE.MEMBERS_TTL);
+  return members;
 }
 
 function membersFromRows_(rows) {
@@ -1915,14 +2035,67 @@ function memberWorkStatus_(value) {
   return Math.max(0, Math.min(1, n));
 }
 
+
 function getSettings_() {
-  return settingsFromRows_(getSheetObjects_(APP.SHEETS.SETTINGS));
+  const cached = getCacheJson_(CACHE.SETTINGS);
+  if (cached) return cached;
+
+  const settings = settingsFromRows_(getSheetObjects_(APP.SHEETS.SETTINGS));
+  putCacheJson_(CACHE.SETTINGS, settings, CACHE.SETTINGS_TTL);
+  return settings;
 }
 
 function settingsFromRows_(rows) {
   const out = {};
   (rows || []).forEach((x) => { out[String(x.key)] = x.value; });
   return out;
+}
+
+
+function getCacheJson_(key) {
+  try {
+    const text = CacheService.getScriptCache().get(key);
+    return text ? JSON.parse(text) : null;
+  } catch (err) {
+    console.warn('Cache read failed:', key, err);
+    return null;
+  }
+}
+
+function putCacheJson_(key, value, ttlSeconds) {
+  try {
+    CacheService.getScriptCache().put(
+      key,
+      JSON.stringify(value),
+      Math.max(1, Number(ttlSeconds || 60))
+    );
+  } catch (err) {
+    console.warn('Cache write failed:', key, err);
+  }
+}
+
+function invalidateMembersCache_() {
+  try {
+    CacheService.getScriptCache().remove(CACHE.MEMBERS);
+  } catch (err) {
+    console.warn('Members cache clear failed:', err);
+  }
+}
+
+function invalidateSettingsCache_() {
+  try {
+    CacheService.getScriptCache().remove(CACHE.SETTINGS);
+  } catch (err) {
+    console.warn('Settings cache clear failed:', err);
+  }
+}
+
+function invalidateDashboardCache_() {
+  try {
+    CacheService.getScriptCache().remove(CACHE.DASHBOARD);
+  } catch (err) {
+    console.warn('Dashboard cache clear failed:', err);
+  }
 }
 
 function getSheetObjects_(sheetName) {

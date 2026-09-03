@@ -1,12 +1,18 @@
-TEAM WORKLOAD — SETUP CHECKLIST
+TEAM WORKLOAD — v1.2 FAST API UPGRADE CHECKLIST
 
-[ ] 1. Replace Apps Script Code.gs
-[ ] 2. Run generateNetlifyApiSecret()
-[ ] 3. Deploy Apps Script Web App: Execute as Me / Anyone
-[ ] 4. Copy Apps Script /exec URL
-[ ] 5. Netlify env: APPS_SCRIPT_API_URL
-[ ] 6. Netlify env: APPS_SCRIPT_API_SECRET
-[ ] 7. Deploy whole project with Netlify CLI
-[ ] 8. Test Dashboard
-[ ] 9. Test Consult then Refresh
-[ ] 10. Test Task / Subtask / OT / Audit
+[ ] 1. Backup Code.gs เดิม
+[ ] 2. Replace Apps Script Code.gs ด้วย apps-script/Code.gs
+[ ] 3. DO NOT run setupNewSystem()
+[ ] 4. DO NOT run resetSystemPointer()
+[ ] 5. Apps Script: Deploy > Manage deployments > Edit > New version > Deploy
+[ ] 6. Confirm APPS_SCRIPT_API_URL still points to /exec
+[ ] 7. GitHub: replace public/index.html
+[ ] 8. GitHub: commit + push
+[ ] 9. Netlify deploy status = Published
+[ ] 10. Hard refresh Ctrl+Shift+R
+[ ] 11. Test Member Status save
+[ ] 12. Test Consult save + refresh (value must not change by itself)
+[ ] 13. Test Task create/edit/complete
+[ ] 14. Test Subtask add/edit/delete
+[ ] 15. Test OT save
+[ ] 16. Open Audit Log and verify writer name

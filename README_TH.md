@@ -316,3 +316,35 @@ generateNetlifyApiSecret()
 
 Netlify ทำหน้าที่เฉพาะ frontend/proxy
 Google Sheet เดิมยังเป็นฐานข้อมูลจริง
+
+---
+
+# v1.2 Fast API — สิ่งที่เปลี่ยน
+
+เวอร์ชันนี้เน้นลดเวลารอหลังการกดบันทึก:
+
+- Save Task / Member / Consult / Subtask / OT ตอบกลับหลังเขียนข้อมูล + Audit
+- ไม่เรียก `getDashboardData()`, `getTasks()`, `getTaskDetail()` หรือ `getOtMonth()` ซ้ำใน request เดียวหลัง Save
+- หน้าเว็บแสดง Success ก่อน แล้ว sync ข้อมูลที่เกี่ยวข้องแบบ background
+- Members cache 5 นาที
+- Settings cache 10 นาที
+- Dashboard cache 20 วินาที และถูก clear ทันทีเมื่อ Task / Consult / Member เปลี่ยน
+- `updateTask()` เขียน Task 1 ครั้ง และ replace TaskMembers แบบ batch
+- `updateSubtask()` เขียนทั้งแถวครั้งเดียว
+- OT ไม่อ่านทั้งเดือนใหม่ก่อนตอบ Success
+
+## การอัปจาก v1.1
+
+1. Apps Script: แทน `Code.gs` ด้วยไฟล์ใน `apps-script/Code.gs`
+2. **ห้ามรัน `setupNewSystem()` และ `resetSystemPointer()`**
+3. ไม่ต้องสร้าง API secret ใหม่ ถ้าใช้ Apps Script project เดิม
+4. Apps Script: Deploy → Manage deployments → Edit → New version → Deploy
+5. GitHub: แทน `public/index.html` ด้วยไฟล์ใหม่
+6. Commit + Push
+7. Netlify จะ deploy จาก GitHub อัตโนมัติ
+8. Environment variables เดิมใช้ต่อ:
+   - `APPS_SCRIPT_API_URL`
+   - `APPS_SCRIPT_API_SECRET`
+9. เปิด Netlify URL แล้วกด Ctrl+Shift+R
+10. ทดสอบ Save Consult, Task และ OT
+
