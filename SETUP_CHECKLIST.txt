@@ -1,0 +1,12 @@
+TEAM WORKLOAD — SETUP CHECKLIST
+
+[ ] 1. Replace Apps Script Code.gs
+[ ] 2. Run generateNetlifyApiSecret()
+[ ] 3. Deploy Apps Script Web App: Execute as Me / Anyone
+[ ] 4. Copy Apps Script /exec URL
+[ ] 5. Netlify env: APPS_SCRIPT_API_URL
+[ ] 6. Netlify env: APPS_SCRIPT_API_SECRET
+[ ] 7. Deploy whole project with Netlify CLI
+[ ] 8. Test Dashboard
+[ ] 9. Test Consult then Refresh
+[ ] 10. Test Task / Subtask / OT / Audit

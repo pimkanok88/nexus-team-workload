@@ -1,0 +1,14 @@
+{
+  "name": "team-workload-netlify-apps-script",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Netlify frontend + Apps Script API + existing Google Sheet",
+  "type": "module",
+  "scripts": {
+    "dev": "npx netlify-cli dev",
+    "deploy": "npx netlify-cli deploy --prod --dir public --functions netlify/functions"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

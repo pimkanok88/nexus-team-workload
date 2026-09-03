@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    :root {
+      --bg: #f7faf9;
+      --panel: #ffffff;
+      --line: #e4ece9;
+      --text: #24313a;
+      --muted: #718078;
+      --primary: #3b82f6;
+      --primary-dark: #2563eb;
+      --primary-soft: #eff6ff;
+      --secondary: #14b8a6;
+      --consult: #f59e0b;
+      --coral: #fb7185;
+      --mint: #34d399;
+      --danger: #dc5a5a;
+      --good: #22a06b;
+      --warn: #d97706;
+      --info: #3b82f6;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top right, #eaf7ff 0, transparent 28%), radial-gradient(circle at bottom left, #ecfdf5 0, transparent 24%), var(--bg);
+      color: var(--text);
+    }
+    button, input, select, textarea { font: inherit; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 230px 1fr; }
+    .sidebar {
+      background: rgba(255,255,255,.96); color: var(--text); padding: 24px 16px;
+      position: sticky; top: 0; height: 100vh; border-right:1px solid var(--line); box-shadow:8px 0 30px rgba(31,41,55,.035);
+    }
+    .brand { font-weight: 850; font-size: 19px; margin: 0 8px 24px; letter-spacing:-.02em; }
+    .nav-btn {
+      width: 100%; border: 0; background: transparent; color: #5f6f68;
+      padding: 12px 14px; text-align: left; border-radius: 10px;
+      cursor: pointer; margin-bottom: 6px;
+    }
+    .nav-btn:hover { background:#f3f8fb; color:var(--text); }
+    .nav-btn.active { background:#eaf5ff; color:#1d4ed8; box-shadow: inset 3px 0 0 #60a5fa; font-weight:800; }
+    .main { padding: 28px; max-width: 1500px; width: 100%; margin: 0 auto; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; gap:12px; }
+    .topbar h1 { margin:0; font-size:26px; }
+    .muted { color: var(--muted); }
+    .page { display:none; }
+    .page.active { display:block; }
+    .grid { display:grid; gap:16px; }
+    .grid.cards { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); }
+    .card, .panel {
+      background: var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+      box-shadow: 0 10px 30px rgba(30,41,59,.06);
+    }
+    .card { padding:18px; position:relative; overflow:hidden; }
+    .card::before { content:''; position:absolute; inset:0 auto 0 0; width:4px; background:linear-gradient(180deg,#60a5fa,#38bdf8); }
+    .grid.cards .card:nth-child(2n)::before { background:linear-gradient(180deg,#34d399,#14b8a6); }
+    .grid.cards .card:nth-child(3n)::before { background:linear-gradient(180deg,#fbbf24,#fb923c); }
+    .grid.cards .card:nth-child(4n)::before { background:linear-gradient(180deg,#fb7185,#fda4af); }
+    .card .label { font-size:13px; color:var(--muted); }
+    .card .value { font-size:28px; font-weight:800; margin-top:6px; }
+    .panel { padding:20px; margin-top:16px; }
+    .panel h2, .panel h3 { margin-top:0; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:11px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+    th.row-no, td.row-no {
+      width:54px; min-width:54px; text-align:center; color:#8a9891;
+      font-variant-numeric: tabular-nums; font-size:12px;
+    }
+    td.row-no { font-weight:800; background:#fbfdfc; }
+    tbody tr:nth-child(even) > td:not(.row-no) { background:rgba(248,250,249,.6); }
+    .row-no-badge {
+      display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px;
+      padding:0 7px; border-radius:999px; background:#f1f5f4; color:#64746c; font-size:11px; font-weight:800;
+    }
+    tr:last-child td { border-bottom:0; }
+    .badge { display:inline-block; padding:4px 9px; border-radius:999px; font-size:12px; font-weight:700; }
+    .badge.good { background:#ecfdf3; color:var(--good); }
+    .badge.warn { background:#fffaeb; color:var(--warn); }
+    .badge.info { background:#eff8ff; color:var(--info); }
+    .badge.neutral { background:#f2f4f7; color:#475467; }
+    .badge.danger { background:#fef3f2; color:var(--danger); }
+    .btn {
+      border:0; border-radius:10px; padding:10px 14px; cursor:pointer;
+      background:#e5e7eb; color:#111827; font-weight:700;
+    }
+    .btn.primary { background:var(--primary); color:white; }
+    .btn.ghost { background:white; border:1px solid var(--line); }
+    .btn.small { padding:7px 10px; font-size:12px; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .form-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+    .form-grid.two { grid-template-columns: repeat(2,1fr); }
+    .field { display:flex; flex-direction:column; gap:6px; }
+    .field.full { grid-column:1/-1; }
+    label { font-size:13px; font-weight:700; }
+    input, select, textarea {
+      width:100%; padding:10px 11px; border:1px solid #d1d5db; border-radius:10px; background:white;
+      transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline:none; border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.16);
+    }
+    textarea { min-height:80px; resize:vertical; }
+    .member-boxes { display:flex; gap:8px; flex-wrap:wrap; }
+    .member-chip { border:1px solid var(--line); padding:8px 10px; border-radius:10px; background:#fafafa; }
+    .member-chip input { width:auto; margin-right:6px; }
+    .toolbar { display:flex; gap:8px; align-items:end; flex-wrap:wrap; }
+    .toolbar .field { min-width:140px; }
+    .split { display:grid; grid-template-columns: minmax(0, 1.25fr) minmax(360px, .75fr); gap:16px; }
+    .day-row { cursor:pointer; }
+    .day-row:hover { background:#fafbff; }
+    .day-row.selected { background:var(--primary-soft); }
+    .member-ot-row {
+      display:grid; grid-template-columns: 32px 100px 1fr 1fr 90px 1.2fr;
+      gap:8px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line);
+    }
+    .member-ot-row input[type="checkbox"] { width:auto; }
+    .small-text { font-size:12px; color:var(--muted); }
+    .member-status-input { width:90px; }
+    .member-status-note { min-width:220px; }
+    .capacity-zero { opacity:.58; }
+    .toast {
+      position:fixed; right:22px; bottom:22px; padding:14px 16px; border-radius:14px;
+      background:#111827; color:white; box-shadow:0 16px 40px rgba(15,23,42,.25);
+      display:none; max-width:460px; z-index:120; min-width:280px;
+      align-items:flex-start; gap:10px; border:1px solid rgba(255,255,255,.14);
+      animation:toastIn .18s ease-out;
+    }
+    .toast.show { display:flex; }
+    .toast.success { background:#067647; }
+    .toast.error { background:#b42318; }
+    .toast.info { background:#175cd3; }
+    .toast-icon { font-size:19px; line-height:1.2; font-weight:900; }
+    .toast-title { font-weight:800; margin-bottom:2px; }
+    .toast-message { font-size:13px; line-height:1.45; opacity:.95; white-space:pre-wrap; }
+    @keyframes toastIn { from { transform:translateY(10px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+
+    .loading-overlay {
+      position:fixed; inset:0; background:rgba(15,23,42,.24); backdrop-filter:blur(2px);
+      z-index:110; display:none; align-items:center; justify-content:center; padding:20px;
+    }
+    .loading-overlay.show { display:flex; }
+    .loading-box {
+      background:white; border:1px solid var(--line); border-radius:18px; padding:22px 26px;
+      min-width:280px; max-width:420px; text-align:center; box-shadow:0 24px 70px rgba(15,23,42,.22);
+    }
+    .spinner {
+      width:42px; height:42px; margin:0 auto 14px; border-radius:50%;
+      border:4px solid #dbeafe; border-top-color:var(--primary);
+      animation:spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-title { font-weight:850; font-size:16px; }
+    .loading-subtitle { margin-top:5px; color:var(--muted); font-size:13px; line-height:1.45; }
+    .loading { pointer-events:none; }
+    .loading .btn { opacity:.65; }
+    .money { font-variant-numeric: tabular-nums; }
+    .right { text-align:right; }
+    .sidebar-user {
+      margin-top:18px; padding:12px; border:1px solid var(--line); border-radius:14px;
+      background:#f8fbff;
+    }
+    .sidebar-user label { display:block; font-size:11px; color:var(--muted); margin-bottom:6px; }
+    .sidebar-user select { padding:8px 9px; font-size:13px; background:white; }
+    .sidebar-user .small-text { margin-top:6px; line-height:1.4; }
+    .empty { padding:24px; color:var(--muted); text-align:center; }
+
+    .task-update-layout { display:grid; grid-template-columns:minmax(520px, .95fr) minmax(520px, 1.05fr); gap:16px; align-items:start; }
+    .filter-grid { display:grid; grid-template-columns:2fr repeat(3, minmax(130px, 1fr)); gap:10px; align-items:end; }
+    .task-list-wrap { max-height:720px; overflow:auto; }
+    .task-update-row { cursor:pointer; }
+    .task-update-row:hover { background:#fafbff; }
+    .task-update-row.selected { background:var(--primary-soft); }
+    .latest-note { max-width:360px; white-space:normal; line-height:1.45; }
+    .history-list { display:flex; flex-direction:column; gap:10px; }
+    .history-item { border:1px solid var(--line); border-radius:12px; padding:12px; background:#fafbff; }
+    .history-meta { display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .history-note { white-space:pre-wrap; line-height:1.5; }
+    .section-divider { border:0; border-top:1px solid var(--line); margin:20px 0; }
+    .sticky-editor { position:sticky; top:20px; }
+    .filter-count { margin-left:auto; font-size:13px; color:var(--muted); }
+
+
+    .page-hero { background:linear-gradient(135deg,#ffffff 0%,#f0f9ff 55%,#ecfdf5 100%); border:1px solid #dbeafe; border-radius:var(--radius); padding:18px 20px; margin-bottom:16px; }
+    .page-hero h2 { margin:0 0 4px; }
+    .consult-entry-grid { display:grid; grid-template-columns:repeat(4,minmax(120px,1fr)); gap:10px; margin-top:14px; }
+    .consult-count-card { border:1px solid var(--line); background:#f8fafc; border-radius:14px; padding:12px; }
+    .consult-count-card strong { display:block; margin-bottom:8px; }
+    .consult-count-card input { font-size:20px; font-weight:800; text-align:center; }
+    .week-banner {
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      margin-top:12px; padding:11px 13px; border-radius:12px;
+      background:#fffaf0; border:1px solid #fde7b2; color:#8a5a00;
+      font-size:13px; font-weight:700;
+    }
+    .week-banner .dot { width:9px; height:9px; border-radius:50%; background:#f59e0b; box-shadow:0 0 0 4px #fef3c7; }
+    .consult-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .subtask-box { border:1px solid #dbeafe; background:#f8fbff; border-radius:14px; padding:12px; margin-top:10px; }
+    .subtask-row { display:grid; grid-template-columns:minmax(170px,1.6fr) minmax(120px,.8fr) minmax(120px,.8fr) auto; gap:8px; align-items:center; padding:9px 0; border-bottom:1px solid var(--line); }
+    .subtask-row:last-child { border-bottom:0; }
+    .progress-track { height:8px; background:#e5e7eb; border-radius:999px; overflow:hidden; min-width:80px; }
+    .progress-fill { height:100%; background:linear-gradient(90deg,#60a5fa,#34d399); border-radius:999px; }
+    .task-title-cell { min-width:220px; }
+    .soft-pill { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:4px 9px; background:#ecfeff; color:#0f766e; font-size:12px; font-weight:700; }
+    .consult-accent { border-top:4px solid var(--consult); }
+
+    /* OT v5.3 — calendar-first, simple entry flow */
+    .ot-toolbar { display:flex; gap:10px; align-items:end; flex-wrap:wrap; }
+    .ot-toolbar .field { min-width:140px; }
+    .ot-help { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; color:var(--muted); font-size:12px; }
+    .ot-calendar-wrap { overflow:auto; }
+    .ot-calendar { display:grid; grid-template-columns:repeat(7,minmax(108px,1fr)); gap:8px; min-width:790px; }
+    .ot-weekday { text-align:center; color:var(--muted); font-weight:800; font-size:12px; padding:5px 0; }
+    .ot-day-blank { min-height:82px; }
+    .ot-day-card {
+      min-height:104px; border:1px solid var(--line); background:#fff; border-radius:14px; padding:10px;
+      cursor:pointer; text-align:left; transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+      display:flex; flex-direction:column; justify-content:space-between; position:relative;
+    }
+    .ot-day-card:hover { transform:translateY(-1px); box-shadow:0 8px 20px rgba(30,41,59,.08); border-color:#bae6fd; }
+    .ot-day-card.selected { border:2px solid #38bdf8; background:#f0f9ff; box-shadow:0 8px 20px rgba(14,165,233,.12); }
+    .ot-day-card.weekend { background:#fffaf3; }
+    .ot-day-card.today::after { content:'วันนี้'; position:absolute; top:8px; right:8px; font-size:10px; font-weight:800; color:#0369a1; background:#e0f2fe; padding:3px 6px; border-radius:999px; }
+    .ot-day-number { font-size:20px; font-weight:850; line-height:1; }
+    .ot-day-name { font-size:11px; color:var(--muted); margin-top:3px; }
+    .ot-day-status { margin-top:10px; font-size:11px; font-weight:750; line-height:1.35; }
+    .ot-day-status.saved { color:#047857; }
+    .ot-day-status.empty { color:#94a3b8; }
+    .ot-day-status.off { color:#b45309; }
+    .ot-day-hours { font-size:11px; color:#64748b; margin-top:3px; }
+
+    .ot-editor-card { position:sticky; top:18px; }
+    .ot-date-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .ot-date-title { font-size:21px; font-weight:850; }
+    .ot-date-sub { color:var(--muted); font-size:12px; margin-top:3px; }
+    .ot-step { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
+    .ot-step:first-of-type { border-top:0; margin-top:0; padding-top:0; }
+    .ot-step-title { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:850; margin-bottom:10px; }
+    .ot-step-no { width:25px; height:25px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:inline-flex; align-items:center; justify-content:center; font-size:12px; }
+    .ot-presets { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .ot-preset-btn { border:1px solid var(--line); background:#fff; border-radius:12px; padding:11px 9px; cursor:pointer; text-align:left; }
+    .ot-preset-btn:hover { border-color:#7dd3fc; background:#f0f9ff; }
+    .ot-preset-btn.active { border-color:#38bdf8; background:#e0f2fe; color:#075985; }
+    .ot-preset-btn.off { background:#fff7ed; }
+    .ot-preset-name { display:block; font-weight:850; font-size:13px; }
+    .ot-preset-time { display:block; font-size:11px; color:var(--muted); margin-top:3px; }
+    .ot-shift-box { display:grid; grid-template-columns:1fr 1fr .8fr; gap:8px; margin-top:10px; padding:12px; border:1px solid #dbeafe; border-radius:12px; background:#f8fbff; }
+    .ot-shift-summary { grid-column:1/-1; color:#0369a1; font-size:12px; font-weight:800; }
+    .ot-member-tools { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:10px; }
+    .ot-person-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .ot-person-card { border:1px solid var(--line); border-radius:13px; padding:10px; background:#fff; transition:.12s ease; }
+    .ot-person-card.selected { border-color:#86efac; background:#f0fdf4; }
+    .ot-person-main { display:flex; align-items:center; gap:9px; cursor:pointer; }
+    .ot-person-main input { width:18px; height:18px; accent-color:#22a06b; }
+    .ot-person-name { font-weight:850; }
+    .ot-person-time { margin-left:auto; color:var(--muted); font-size:11px; }
+    .ot-role-wrap { display:none; gap:5px; flex-wrap:wrap; margin-top:9px; padding-top:9px; border-top:1px dashed #dce5e2; }
+    .ot-person-card.selected .ot-role-wrap { display:flex; }
+    .ot-role-chip { display:inline-flex; align-items:center; gap:4px; padding:5px 7px; border-radius:999px; background:#f8fafc; border:1px solid var(--line); font-size:10px; cursor:pointer; }
+    .ot-role-chip:has(input:checked) { background:#e0f2fe; border-color:#7dd3fc; color:#075985; font-weight:800; }
+    .ot-role-chip input { width:auto; margin:0; }
+    .ot-person-advanced { display:none; grid-template-columns:1fr 1fr .7fr; gap:6px; margin-top:9px; }
+    .ot-person-advanced.show { display:none; }
+    .ot-person-card.selected .ot-person-advanced.show { display:grid; }
+    .ot-advanced-toggle { display:flex; align-items:center; gap:7px; color:#475569; font-size:12px; margin-top:10px; }
+    .ot-advanced-toggle input { width:auto; }
+    .ot-savebar { margin-top:16px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .ot-savebar .btn.primary { flex:1; min-width:180px; padding:12px 16px; }
+    .ot-selected-count { font-size:12px; font-weight:800; color:#047857; }
+    @media (max-width: 1100px) {
+      .grid.cards { grid-template-columns: repeat(2,1fr); }
+      .form-grid { grid-template-columns: repeat(2,1fr); }
+      .split, .task-update-layout { grid-template-columns: 1fr; }
+      .filter-grid { grid-template-columns: repeat(2,1fr); }
+      .consult-entry-grid { grid-template-columns:repeat(2,1fr); }
+    }
+    @media (max-width: 760px) {
+      .app { grid-template-columns:1fr; }
+      .sidebar { position:relative; height:auto; display:flex; gap:6px; overflow:auto; padding:10px; }
+      .brand { display:none; }
+      .nav-btn { width:auto; white-space:nowrap; margin:0; }
+      .main { padding:16px; }
+      .grid.cards, .form-grid, .form-grid.two, .filter-grid, .consult-entry-grid, .consult-summary-grid { grid-template-columns:1fr; }
+      .member-ot-row { grid-template-columns:32px 80px 1fr 1fr; }
+      .member-ot-row .break-col, .member-ot-row .roles-col { grid-column: span 2; }
+      .ot-person-grid { grid-template-columns:1fr; }
+      .ot-presets { grid-template-columns:1fr; }
+      .ot-shift-box { grid-template-columns:1fr 1fr; }
+      .ot-shift-box .field:nth-child(3) { grid-column:1/-1; }
+    }
+  </style>
+</head>
+<body>
+<div class="app" id="appRoot">
+  <aside class="sidebar">
+    <div class="brand" id="brand">Team Workload & OT</div>
+    <button class="nav-btn active" data-page="dashboard">📊 Dashboard</button>
+    <button class="nav-btn" data-page="members">👥 สมาชิก</button>
+    <button class="nav-btn" data-page="consult">💬 Consult</button>
+    <button class="nav-btn" data-page="tasks">📌 งานทีม</button>
+    <button class="nav-btn" data-page="task-update">📝 อัปเดตงาน</button>
+    <button class="nav-btn" data-page="ot">⏱️ OT</button>
+    <button class="nav-btn" data-page="audit">🧾 Audit Log</button>
+    <div class="sidebar-user">
+      <label for="actorSelect">ผู้บันทึกข้อมูล</label>
+      <select id="actorSelect">
+        <option value="">กำลังโหลดสมาชิก...</option>
+      </select>
+      <div class="small-text">ใช้ชื่อที่เลือกใน Audit Log</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <div class="muted">Netlify Frontend · Apps Script API · Google Sheet เดิม</div>
+      </div>
+      <button class="btn ghost" onclick="refreshAll()">รีเฟรช</button>
+    </div>
+
+    <section id="page-dashboard" class="page active">
+      <div id="dashboardCards" class="grid cards"></div>
+      <div class="panel">
+        <h2>Workload รายคน</h2>
+        <div class="small-text">Workload = Weight งาน Active + Consult สัปดาห์ปัจจุบัน (1 Consult = Weight 1) · Target ปรับตาม Member Status</div><div id="dashboardWeekLabel" class="small-text" style="margin-top:5px;font-weight:700;color:#3b82f6"></div>
+        <div style="overflow:auto;margin-top:10px">
+          <table>
+            <thead>
+              <tr><th class="row-no">No.</th><th>Member</th><th>Status</th><th>Consult</th><th>งานอื่น</th><th>Workload</th><th>Target</th><th>งาน Active</th><th>รับ Consult เพิ่ม</th></tr>
+            </thead>
+            <tbody id="workloadBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-members" class="page">
+      <div class="panel">
+        <h2>สถานะ / กำลังรับงานของสมาชิก</h2>
+        <div class="small-text">
+          ค่าเริ่มต้น = 1 · ใช้ 0.5 เมื่อลดภาระงานครึ่งหนึ่ง · ใช้ 0 เมื่อลา/ไม่รับงานใหม่ · ปรับเลข 0–1 ได้เอง
+        </div>
+        <div class="small-text" style="margin-top:6px">
+          การเปลี่ยนค่านี้ไม่แก้ Weight ของงานเดิมย้อนหลัง แต่จะเปลี่ยน Target และ “รับ Consult เพิ่ม” บน Dashboard ทันที
+        </div>
+        <div style="overflow:auto;margin-top:14px">
+          <table>
+            <thead>
+              <tr><th class="row-no">No.</th><th>Member</th><th>Work status</th><th>สถานะ/หมายเหตุ</th><th>แก้ล่าสุด</th><th></th></tr>
+            </thead>
+            <tbody id="memberStatusBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-consult" class="page">
+      <div class="page-hero consult-accent">
+        <h2>บันทึก Consult รายสัปดาห์</h2>
+        <div class="muted">1 Consult = Weight 1 · ใช้สำหรับเกลี่ย workload เฉพาะสัปดาห์นั้น (จันทร์–ศุกร์) และเริ่มนับใหม่ทุกสัปดาห์</div>
+      </div>
+
+      <div class="panel consult-accent">
+        <div class="toolbar">
+          <div class="field">
+            <label>เลือกวันที่ในสัปดาห์</label>
+            <input id="consultEntryDate" type="date" onchange="updateConsultWeekLabel()">
+          </div>
+          <button class="btn ghost" onclick="loadConsultWeekIntoForm()">โหลดสัปดาห์นี้</button>
+          <button class="btn primary" onclick="saveConsultWeek()">บันทึกยอดสัปดาห์</button>
+        </div>
+        <div id="consultWeekLabel" class="week-banner"><span class="dot"></span><span>กำลังคำนวณช่วงสัปดาห์...</span></div>
+        <div id="consultCountInputs" class="consult-entry-grid"></div>
+        <div class="small-text" style="margin-top:10px">กรอก “จำนวนเรื่องรวมของสัปดาห์” ต่อคน ไม่ต้องกรอกรายวัน · ใส่ 0 หรือเว้นว่างได้ · เมื่อเข้าสัปดาห์ใหม่ Dashboard จะใช้งาน Consult ของสัปดาห์ใหม่โดยอัตโนมัติ</div>
+      </div>
+
+      <div id="consultCards" class="grid cards" style="margin-top:16px"></div>
+
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:end;flex-wrap:wrap">
+          <div>
+            <h2 style="margin-bottom:4px">ประวัติ Consult</h2>
+            <div class="small-text">Filter ย้อนหลังตามช่วงวันที่และสมาชิกได้ โดยยอดที่ใช้เกลี่ยงานบน Dashboard จะใช้เฉพาะสัปดาห์ปัจจุบัน</div>
+          </div>
+          <div class="toolbar">
+            <div class="field"><label>ตั้งแต่</label><input id="consultStart" type="date"></div>
+            <div class="field"><label>ถึง</label><input id="consultEnd" type="date"></div>
+            <div class="field"><label>Member</label><select id="consultMemberFilter"><option value="">ทั้งหมด</option></select></div>
+            <button class="btn primary" onclick="loadConsultData()">Filter</button>
+            <button class="btn ghost" onclick="setConsultCurrentWeek()">สัปดาห์นี้</button>
+          </div>
+        </div>
+
+        <div class="consult-summary-grid" style="margin-top:16px">
+          <div style="overflow:auto">
+            <h3>ยอดรายคน</h3>
+            <table>
+              <thead><tr><th class="row-no">No.</th><th>Member</th><th>จำนวนเรื่อง</th></tr></thead>
+              <tbody id="consultSummaryBody"></tbody>
+            </table>
+          </div>
+          <div style="overflow:auto;max-height:440px">
+            <h3>รายการย้อนหลัง</h3>
+            <table>
+              <thead><tr><th class="row-no">No.</th><th>Date</th><th>Member</th><th>จำนวน</th></tr></thead>
+              <tbody id="consultHistoryBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-tasks" class="page">
+      <div class="panel">
+        <h2>เพิ่มงานใหม่</h2>
+        <div class="form-grid">
+          <div class="field">
+            <label>ชื่องาน</label>
+            <input id="taskJob" placeholder="เช่น วิเคราะห์ข้อมูลหมอ...">
+          </div>
+          <div class="field">
+            <label>ผู้มอบหมาย / Stakeholder</label>
+            <input id="taskHolder">
+          </div>
+          <div class="field">
+            <label>Weight</label>
+            <input id="taskWeight" type="number" min="0" step="0.5" value="1">
+          </div>
+          <div class="field">
+            <label>Start date</label><input id="taskStart" type="date">
+          </div>
+          <div class="field">
+            <label>Due date</label><input id="taskDue" type="date">
+          </div>
+          <div class="field">
+            <label>Deadline</label><input id="taskDeadline" type="date">
+          </div>
+          <div class="field">
+            <label>Status</label>
+            <select id="taskStatus">
+              <option>not start</option>
+              <option selected>Inprocess</option>
+              <option>Complete</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label>รายละเอียด</label>
+            <textarea id="taskDescription"></textarea>
+          </div>
+          <div class="field full">
+            <label>ผู้รับผิดชอบ</label>
+            <div id="taskMemberBoxes" class="member-boxes"></div>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn primary" onclick="saveTask()">บันทึกงาน</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>รายการงาน</h2>
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr><th class="row-no">No.</th><th>Task</th><th>Weight</th><th>ผู้รับผิดชอบ</th><th>Subtasks</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="taskTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="page-task-update" class="page">
+      <div class="panel">
+        <div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <h2 style="margin-bottom:4px">ค้นหาและอัปเดตงานทีม</h2>
+            <div class="small-text">เลือกงานจากรายการด้านล่าง แล้วแก้ข้อมูลปัจจุบันหรือเพิ่ม Update ใหม่ได้</div>
+          </div>
+          <div id="updateFilterCount" class="filter-count"></div>
+        </div>
+        <div class="filter-grid" style="margin-top:14px">
+          <div class="field">
+            <label>ค้นหา</label>
+            <input id="updSearch" placeholder="ชื่องาน / รายละเอียด / ผู้มอบหมาย / update ล่าสุด">
+          </div>
+          <div class="field">
+            <label>Status</label>
+            <select id="updStatusFilter">
+              <option value="">ทั้งหมด</option>
+              <option value="not start">not start</option>
+              <option value="Inprocess">Inprocess</option>
+              <option value="Complete">Complete</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Member</label>
+            <select id="updMemberFilter"><option value="">ทั้งหมด</option></select>
+          </div>
+          <div class="field">
+            <label>เรียงตาม</label>
+            <select id="updSortFilter">
+              <option value="activity">อัปเดตล่าสุด</option>
+              <option value="due">Due date</option>
+              <option value="weight">Weight มาก → น้อย</option>
+              <option value="name">ชื่องาน A → Z</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <button class="btn small ghost" onclick="clearUpdateFilters()">ล้าง Filter</button>
+        </div>
+      </div>
+
+      <div class="task-update-layout">
+        <div class="panel">
+          <h2>รายการงาน</h2>
+          <div class="task-list-wrap">
+            <table>
+              <thead>
+                <tr><th class="row-no">No.</th><th>งาน</th><th>Member</th><th>Status</th><th>Due</th><th>Update ล่าสุด</th></tr>
+              </thead>
+              <tbody id="taskUpdateListBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel sticky-editor">
+          <div id="taskEditorEmpty" class="empty">เลือกงานจากรายการด้านซ้ายเพื่อแก้ไข</div>
+          <div id="taskEditorForm" style="display:none">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+              <div>
+                <h2 id="editTaskTitle" style="margin-bottom:4px">แก้ไขงาน</h2>
+                <div id="editTaskId" class="small-text"></div>
+              </div>
+              <span id="editTaskStatusBadge" class="badge warn"></span>
+            </div>
+
+            <div class="form-grid" style="margin-top:16px">
+              <div class="field">
+                <label>ชื่องาน</label><input id="editJob">
+              </div>
+              <div class="field">
+                <label>ผู้มอบหมาย / Stakeholder</label><input id="editHolder">
+              </div>
+              <div class="field">
+                <label>Weight</label><input id="editWeight" type="number" min="0" step="0.5">
+              </div>
+              <div class="field"><label>Start date</label><input id="editStart" type="date"></div>
+              <div class="field"><label>Due date</label><input id="editDue" type="date"></div>
+              <div class="field"><label>Deadline</label><input id="editDeadline" type="date"></div>
+              <div class="field">
+                <label>Status</label>
+                <select id="editStatus">
+                  <option>not start</option><option>Inprocess</option><option>Complete</option><option>Cancelled</option>
+                </select>
+              </div>
+              <div class="field full"><label>รายละเอียดงาน</label><textarea id="editDescription"></textarea></div>
+              <div class="field full">
+                <label>ผู้รับผิดชอบ</label>
+                <div id="editMemberBoxes" class="member-boxes"></div>
+                <div class="small-text">เมื่อเปลี่ยนสมาชิก ระบบจะคำนวณ share weight ใหม่ = Weight ÷ จำนวนคน</div>
+              </div>
+            </div>
+
+            <hr class="section-divider">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+              <div>
+                <h3 style="margin:0">Subtasks</h3>
+                <div class="small-text">แตกงานย่อยได้ โดย Weight ของ workload ยังคิดจาก Task หลักเท่านั้น</div>
+              </div>
+              <span id="subtaskProgressLabel" class="soft-pill">0 / 0</span>
+            </div>
+            <div class="subtask-box">
+              <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr auto">
+                <div class="field"><label>ชื่อ Subtask</label><input id="newSubtaskTitle" placeholder="เช่น Clean data"></div>
+                <div class="field"><label>Due date</label><input id="newSubtaskDue" type="date"></div>
+                <div class="field"><label>Status</label><select id="newSubtaskStatus"><option>not start</option><option>Inprocess</option><option>Complete</option><option>Cancelled</option></select></div>
+                <div class="field" style="justify-content:end"><button class="btn primary" onclick="addSubtask()">+ เพิ่ม</button></div>
+                <div class="field full"><label>รายละเอียดสั้น ๆ (ไม่บังคับ)</label><input id="newSubtaskDescription"></div>
+              </div>
+              <div id="subtaskList" style="margin-top:10px"></div>
+            </div>
+
+            <hr class="section-divider">
+            <h3>Update ล่าสุด</h3>
+            <div class="small-text">ส่วนนี้จะเพิ่มเป็นประวัติใหม่ใน TaskUpdates และไม่ทับ Update เก่า หากยังไม่มีข้อมูลใหม่สามารถเว้นว่างได้</div>
+            <div class="form-grid" style="margin-top:12px">
+              <div class="field"><label>วันที่ Update</label><input id="editUpdateDate" type="date"></div>
+              <div class="field">
+                <label>ผู้เกี่ยวข้องกับ Update</label>
+                <select id="editUpdateMember"><option value="">ไม่ระบุ</option></select>
+              </div>
+              <div class="field"><label>Progress (%)</label><input id="editProgress" type="number" min="0" max="100" step="1" placeholder="ไม่บังคับ"></div>
+              <div class="field"><label>ข้อมูลล่าสุด</label><textarea id="editUpdateNote" placeholder="เช่น ส่งผลรอบแรกแล้ว รอผู้วิจัยตอบกลับ"></textarea></div>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+              <button class="btn primary" onclick="saveTaskEdit()">บันทึกการแก้ไข</button>
+              <button class="btn ghost" onclick="clearLatestUpdateInput()">ล้างช่อง Update ล่าสุด</button>
+            </div>
+
+            <hr class="section-divider">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+              <h3 style="margin:0">ประวัติ Update</h3>
+              <div id="editUpdateCount" class="small-text"></div>
+            </div>
+            <div id="taskUpdateHistory" class="history-list" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-ot" class="page">
+      <div class="page-hero">
+        <h2>⏱️ บันทึก OT</h2>
+        <div class="muted">เลือกวันที่จากปฏิทิน → เลือกกะ → เลือกคน แล้วบันทึกได้เลย</div>
+      </div>
+
+      <div class="panel">
+        <div class="ot-toolbar">
+          <div class="field">
+            <label>เดือน</label>
+            <select id="otMonth"></select>
+          </div>
+          <div class="field">
+            <label>ปี</label>
+            <input id="otYear" type="number" min="2020" max="2100">
+          </div>
+          <button class="btn primary" onclick="loadOtMonth()">แสดงปฏิทิน</button>
+        </div>
+        <div class="ot-help">
+          <span class="soft-pill">วันธรรมดา 16:00–18:00</span>
+          <span class="soft-pill">เสาร์–อาทิตย์ 08:00–16:00 พัก 1 ชม.</span>
+          <span>วันที่จะแสดงครบทุกวัน แม้ยังไม่เคยบันทึก OT · เลือกวันแล้วบันทึกเฉพาะวันที่ใช้งาน</span>
+        </div>
+      </div>
+
+      <div id="otCards" class="grid cards" style="margin-top:16px"></div>
+
+      <div class="split">
+        <div>
+          <div class="panel">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+              <div>
+                <h2 style="margin-bottom:3px">ปฏิทิน OT</h2>
+                <div class="small-text">กดวันที่เพื่อกรอกหรือแก้ไข OT</div>
+              </div>
+              <div id="otCalendarMonthLabel" class="soft-pill"></div>
+            </div>
+            <div class="ot-calendar-wrap" style="margin-top:14px">
+              <div id="otCalendar" class="ot-calendar"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>สรุปรายเดือนรายคน</h2>
+            <div style="overflow:auto">
+              <table>
+                <thead>
+                  <tr><th class="row-no">No.</th><th>Member</th><th>Hours</th><th>Amount</th><th>Weekday days</th><th>Weekend days</th></tr>
+                </thead>
+                <tbody id="otSummaryBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel ot-editor-card" id="otEditor">
+          <div id="otEditorEmpty" class="empty">เลือกวันที่จากปฏิทิน</div>
+          <div id="otEditorForm" style="display:none">
+            <div class="ot-date-heading">
+              <div>
+                <div id="otSelectedDate" class="ot-date-title"></div>
+                <div id="otSelectedDayType" class="ot-date-sub"></div>
+              </div>
+              <span id="otSavedBadge" class="badge neutral">ยังไม่บันทึก</span>
+            </div>
+
+            <div class="ot-step">
+              <div class="ot-step-title"><span class="ot-step-no">1</span> เลือกกะ</div>
+              <div class="ot-presets">
+                <button type="button" class="ot-preset-btn" id="presetWeekday" onclick="applyOtPreset('weekday')">
+                  <span class="ot-preset-name">วันธรรมดา</span><span class="ot-preset-time">16:00–18:00 · 2 ชม.</span>
+                </button>
+                <button type="button" class="ot-preset-btn" id="presetWeekend" onclick="applyOtPreset('weekend')">
+                  <span class="ot-preset-name">เสาร์–อาทิตย์</span><span class="ot-preset-time">08:00–16:00 · พัก 1 ชม.</span>
+                </button>
+                <button type="button" class="ot-preset-btn off" id="presetOff" onclick="applyOtPreset('off')">
+                  <span class="ot-preset-name">ไม่ทำ OT</span><span class="ot-preset-time">ล้างรายชื่อของวันนี้</span>
+                </button>
+              </div>
+
+              <div class="ot-shift-box">
+                <div class="field"><label>เริ่ม</label><input id="schStart" type="time" onchange="onOtShiftChanged()"></div>
+                <div class="field"><label>สิ้นสุด</label><input id="schEnd" type="time" onchange="onOtShiftChanged()"></div>
+                <div class="field"><label>พัก (ชม.)</label><input id="schBreak" type="number" step="0.5" min="0" onchange="onOtShiftChanged()"></div>
+                <input id="schActive" type="hidden" value="true">
+                <div id="otShiftSummary" class="ot-shift-summary"></div>
+              </div>
+            </div>
+
+            <div class="ot-step">
+              <div class="ot-step-title"><span class="ot-step-no">2</span> เลือกสมาชิกที่ทำ OT</div>
+              <div class="ot-member-tools">
+                <button type="button" class="btn small ghost" onclick="selectAllOtMembers(true)">เลือกทุกคน</button>
+                <button type="button" class="btn small ghost" onclick="selectAllOtMembers(false)">ล้างทั้งหมด</button>
+                <span id="otSelectedCount" class="ot-selected-count"></span>
+              </div>
+              <div id="otMemberRows" class="ot-person-grid"></div>
+
+              <label class="ot-advanced-toggle">
+                <input id="otAdvancedToggle" type="checkbox" onchange="toggleOtAdvanced(this.checked)">
+                เวลาของบางคนไม่เหมือนกะหลัก — ปรับเวลาเฉพาะราย
+              </label>
+              <div class="small-text" style="margin-top:5px">ถ้าทุกคนทำเวลาเดียวกัน ไม่ต้องเปิดตัวเลือกนี้</div>
+            </div>
+
+            <div class="ot-step">
+              <div class="ot-step-title"><span class="ot-step-no">3</span> หมายเหตุและบันทึก</div>
+              <div class="field"><label>หมายเหตุ (ถ้ามี)</label><input id="schNote" placeholder="เช่น กิจกรรมพิเศษ / งานเร่งด่วน"></div>
+              <div class="ot-savebar">
+                <button class="btn primary" onclick="saveOtDay()">✓ บันทึก OT วันนี้</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-audit" class="page">
+      <div class="panel">
+        <h2>Audit Log ล่าสุด</h2>
+        <div style="overflow:auto">
+          <table>
+            <thead><tr><th class="row-no">No.</th><th>เวลา</th><th>User</th><th>Action</th><th>Module</th><th>Record</th></tr></thead>
+            <tbody id="auditBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-busy="true">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div id="loadingTitle" class="loading-title">กำลังดำเนินการ...</div>
+    <div id="loadingSubtitle" class="loading-subtitle">กรุณาอย่าปิดหน้านี้จนกว่าจะเสร็จ</div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite">
+  <div id="toastIcon" class="toast-icon">✓</div>
+  <div>
+    <div id="toastTitle" class="toast-title">สำเร็จ</div>
+    <div id="toastMessage" class="toast-message"></div>
+  </div>
+</div>
+
+<script>
+const state = {
+  members: [],
+  settings: {},
+  dashboard: null,
+  tasks: [],
+  consult: null,
+  audit: [],
+  ot: null,
+  selectedDate: null,
+  otAdvanced: false,
+  selectedTaskId: null,
+  selectedTaskDetail: null,
+  originalEditDates: {startDate:'', dueDate:'', deadline:''},
+  currentPage: 'dashboard',
+  tasksLoaded: false,
+  auditLoaded: false,
+  otLoaded: false
+};
+
+const roleOptions = ['Mag.', 'Front', 'Back', 'Log', 'QA', 'Dev', 'Other'];
+const monthNames = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
+
+document.addEventListener('DOMContentLoaded', () => {
+  bindNavigation();
+  bindActorSelector();
+  initMonthSelect();
+  bindTaskUpdateFilters();
+  refreshAll();
+});
+
+function getActor() {
+  const el = document.getElementById('actorSelect');
+  return (el && el.value) || localStorage.getItem('teamWorkloadActor') || '';
+}
+
+function bindActorSelector() {
+  const el = document.getElementById('actorSelect');
+  if (!el || el.dataset.bound === '1') return;
+  el.dataset.bound = '1';
+  el.addEventListener('change', () => {
+    if (el.value) localStorage.setItem('teamWorkloadActor', el.value);
+  });
+}
+
+function renderActorSelector() {
+  const el = document.getElementById('actorSelect');
+  if (!el) return;
+
+  const previous = el.value || localStorage.getItem('teamWorkloadActor') || '';
+  el.innerHTML = '<option value="">เลือกผู้บันทึก</option>' +
+    state.members.map(m => `<option value="${escAttr(m.name)}">${esc(m.name)}</option>`).join('');
+
+  if (state.members.some(m => m.name === previous)) {
+    el.value = previous;
+  } else if (state.members.length) {
+    el.value = state.members[0].name;
+    localStorage.setItem('teamWorkloadActor', el.value);
+  }
+}
+
+async function server(fn, ...args) {
+  let response;
+  try {
+    response = await fetch('/api', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        fn,
+        args,
+        actor: getActor()
+      })
+    });
+  } catch (err) {
+    throw new Error('เชื่อมต่อ API ไม่ได้: ' + (err && err.message ? err.message : String(err)));
+  }
+
+  const text = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch (err) {
+    throw new Error(
+      'API ตอบกลับไม่ใช่ JSON กรุณาตรวจ Netlify Environment Variables และ Apps Script deployment'
+    );
+  }
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `API error (${response.status})`);
+  }
+  return payload.data;
+}
+
+async function refreshAll() {
+  setLoading(true, 'กำลังโหลดข้อมูล...', 'โหลดเฉพาะข้อมูลที่จำเป็นก่อน เพื่อให้เปิดหน้าเร็วขึ้น');
+  try {
+    const data = await server('getBootstrapData');
+    state.members = data.members || [];
+    state.settings = data.settings || {};
+    renderActorSelector();
+    state.dashboard = data.dashboard;
+    state.consult = data.consult || null;
+
+    // Heavy pages are lazy-loaded. Mark them stale after a manual refresh.
+    state.tasks = [];
+    state.audit = [];
+    state.ot = null;
+    state.tasksLoaded = false;
+    state.auditLoaded = false;
+    state.otLoaded = false;
+    state.selectedTaskId = null;
+    state.selectedTaskDetail = null;
+
+    document.getElementById('brand').textContent = data.appName || 'Team Workload & OT';
+    document.getElementById('otYear').value = data.currentYear;
+    document.getElementById('otMonth').value = data.currentMonth;
+
+    renderTaskMembers();
+    renderMemberStatus();
+    renderConsultMemberOptions();
+    renderConsult();
+    fillConsultInputsFromSummary(state.consult ? state.consult.summary : []);
+    renderDashboard();
+    renderTasks();
+    renderTaskUpdateFilters();
+    renderTaskUpdateList();
+    renderAudit();
+
+    // If the user refreshed while already on a lazy page, refresh that page too,
+    // but reuse the same loading overlay instead of making the initial Dashboard wait.
+    await ensurePageData(state.currentPage, false);
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function bindNavigation() {
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      document.querySelectorAll('.nav-btn').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      const page = btn.dataset.page;
+      state.currentPage = page;
+      document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
+      document.getElementById('page-' + page).classList.add('active');
+      document.getElementById('pageTitle').textContent =
+        page === 'dashboard' ? 'Dashboard' :
+        page === 'members' ? 'สมาชิก' :
+        page === 'consult' ? 'Consult' :
+        page === 'tasks' ? 'งานทีม' :
+        page === 'task-update' ? 'อัปเดตงาน' :
+        page === 'ot' ? 'OT' : 'Audit Log';
+
+      await ensurePageData(page, true);
+    });
+  });
+}
+
+async function ensurePageData(page, showLoader = true) {
+  if ((page === 'tasks' || page === 'task-update') && !state.tasksLoaded) {
+    await loadTasksData(showLoader);
+  } else if (page === 'ot' && !state.otLoaded) {
+    await loadOtMonth(showLoader);
+  } else if (page === 'audit' && !state.auditLoaded) {
+    await loadAuditData(showLoader);
+  }
+}
+
+async function loadTasksData(showLoader = true) {
+  if (showLoader) setLoading(true, 'กำลังโหลดงาน...', 'ดึงรายละเอียดงาน Update และ Subtask เมื่อเปิดเมนูนี้เท่านั้น');
+  try {
+    state.tasks = await server('getTasks');
+    state.tasksLoaded = true;
+    renderTasks();
+    renderTaskUpdateFilters();
+    renderTaskUpdateList();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    if (showLoader) setLoading(false);
+  }
+}
+
+async function loadAuditData(showLoader = true) {
+  if (showLoader) setLoading(true, 'กำลังโหลด Audit Log...', 'อ่านเฉพาะ 50 รายการล่าสุด');
+  try {
+    state.audit = await server('getAuditLogs', 50);
+    state.auditLoaded = true;
+    renderAudit();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    if (showLoader) setLoading(false);
+  }
+}
+
+function initMonthSelect() {
+  const sel = document.getElementById('otMonth');
+  sel.innerHTML = monthNames.map((m, i) =>
+    `<option value="${i+1}">${m}</option>`
+  ).join('');
+}
+
+function renderDashboard() {
+  const d = state.dashboard || {members:[]};
+  const cards = [
+    ['Consult อ้างอิง', fmt(d.consultReference)],
+    ['Consult สัปดาห์นี้', fmt(d.consultActual)],
+    ['งานอื่น', fmt(d.otherActual)],
+    ['Workload รวม', fmt(d.total)],
+    ['กำลังคนรวม (FTE)', fmt(d.totalCapacity)],
+    ['Target / Status 1', fmt(d.average)]
+  ];
+  document.getElementById('dashboardCards').innerHTML = cards.map(([l,v]) =>
+    `<div class="card"><div class="label">${esc(l)}</div><div class="value">${esc(v)}</div></div>`
+  ).join('');
+
+  const dashWeek = document.getElementById('dashboardWeekLabel');
+  if (dashWeek && d.consultPeriod) {
+    dashWeek.textContent = `Consult ที่ใช้เกลี่ยงาน: ${formatShortDate(d.consultPeriod.startDate)} – ${formatShortDate(d.consultPeriod.endDate)} (จันทร์–ศุกร์)`;
+  }
+
+  document.getElementById('workloadBody').innerHTML = (d.members || []).map((x, index) => {
+    const badge = x.remainingConsult > 1 ? 'good' : x.remainingConsult < -1 ? 'danger' : 'warn';
+    return `<tr class="${Number(x.workStatus) === 0 ? 'capacity-zero' : ''}">
+      <td class="row-no">${index + 1}</td>
+      <td><strong>${esc(x.member)}</strong><div class="small-text">${esc(x.statusNote || '')}</div></td>
+      <td><span class="badge ${Number(x.workStatus) === 1 ? 'good' : Number(x.workStatus) === 0 ? 'danger' : 'warn'}">${fmt(x.workStatus)}</span></td>
+      <td>${fmt(x.consult)}</td>
+      <td>${fmt(x.other)}</td>
+      <td>${fmt(x.workload)}</td>
+      <td>${fmt(x.targetWorkload)}</td>
+      <td>${fmt(x.activeTasks)}</td>
+      <td><span class="badge ${badge}">${signed(x.remainingConsult)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderTaskMembers() {
+  document.getElementById('taskMemberBoxes').innerHTML = state.members.map(m =>
+    `<label class="member-chip ${Number(m.workStatus) === 0 ? 'capacity-zero' : ''}"><input type="checkbox" name="taskMember" value="${escAttr(m.name)}">${esc(m.name)} <span class="small-text">(${fmt(m.workStatus)})</span></label>`
+  ).join('');
+}
+
+function renderMemberStatus() {
+  const body = document.getElementById('memberStatusBody');
+  if (!body) return;
+  body.innerHTML = state.members.map((m, index) => `
+    <tr class="${Number(m.workStatus) === 0 ? 'capacity-zero' : ''}">
+      <td class="row-no">${index + 1}</td>
+      <td><strong>${esc(m.name)}</strong><div class="small-text">${esc(m.id)}</div></td>
+      <td>
+        <input class="member-status-input" id="memberStatus_${escAttr(m.id)}" type="number" min="0" max="1" step="0.1" value="${escAttr(m.workStatus)}">
+      </td>
+      <td><input class="member-status-note" id="memberNote_${escAttr(m.id)}" value="${escAttr(m.statusNote || '')}" placeholder="เช่น ปกติ / ลาเรียน / รับงาน 50%"></td>
+      <td class="small-text">${esc(m.statusUpdatedAt || '-')}</td>
+      <td><button class="btn small primary" onclick="saveMemberStatus('${escAttr(m.id)}')">บันทึก</button></td>
+    </tr>
+  `).join('');
+}
+
+async function saveMemberStatus(memberId) {
+  const statusEl = document.getElementById(`memberStatus_${memberId}`);
+  const noteEl = document.getElementById(`memberNote_${memberId}`);
+  const workStatus = Number(statusEl.value);
+  if (!Number.isFinite(workStatus) || workStatus < 0 || workStatus > 1) {
+    toast('Status ต้องอยู่ระหว่าง 0 ถึง 1', 'error');
+    return;
+  }
+
+  setLoading(true, 'กำลังบันทึกสถานะสมาชิก...', 'กำลังปรับกำลังรับงานและคำนวณ Dashboard ใหม่');
+  try {
+    const res = await server('saveMemberStatus', {
+      memberId,
+      workStatus,
+      statusNote: noteEl.value.trim()
+    });
+    state.members = res.members || state.members;
+    state.dashboard = res.dashboard || state.dashboard;
+    renderMemberStatus();
+    renderTaskMembers();
+    renderDashboard();
+    renderTaskUpdateFilters();
+    if (state.selectedTaskDetail) fillTaskEditor(state.selectedTaskDetail);
+    toast('บันทึกสถานะสมาชิกสำเร็จ', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function saveTask() {
+  const members = [...document.querySelectorAll('input[name="taskMember"]:checked')].map(x => x.value);
+  const payload = {
+    category: 'Other',
+    job: document.getElementById('taskJob').value.trim(),
+    description: document.getElementById('taskDescription').value.trim(),
+    holder_name: document.getElementById('taskHolder').value.trim(),
+    start_date: document.getElementById('taskStart').value,
+    due_date: document.getElementById('taskDue').value,
+    deadline: document.getElementById('taskDeadline').value,
+    weight: Number(document.getElementById('taskWeight').value || 0),
+    status: document.getElementById('taskStatus').value,
+    members
+  };
+
+  setLoading(true, 'กำลังบันทึกงาน...', 'กำลังเพิ่มงานและกระจาย Weight ให้ผู้รับผิดชอบ');
+  try {
+    const res = await server('createTask', payload);
+    state.dashboard = res.dashboard;
+    state.tasks = res.tasks;
+    state.tasksLoaded = true;
+    clearTaskForm();
+    renderDashboard();
+    renderTasks();
+    renderTaskUpdateList();
+    toast('บันทึกงานสำเร็จ', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function clearTaskForm() {
+  ['taskJob','taskDescription','taskHolder','taskStart','taskDue','taskDeadline'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('taskWeight').value = 1;
+  document.getElementById('taskStatus').value = 'Inprocess';
+  document.querySelectorAll('input[name="taskMember"]').forEach(x => x.checked = false);
+}
+
+function renderTasks() {
+  const body = document.getElementById('taskTableBody');
+  if (!state.tasks.length) {
+    body.innerHTML = `<tr><td colspan="7" class="empty">${state.tasksLoaded ? 'ยังไม่มีงาน' : 'รายการงานจะโหลดเมื่อเปิดเมนูนี้'}</td></tr>`;
+    return;
+  }
+  body.innerHTML = state.tasks.slice(0, 200).map((t, index) => `
+    <tr>
+      <td class="row-no">${index + 1}</td>
+      <td><strong>${esc(t.job)}</strong><div class="small-text">${esc(t.taskId)}</div></td>
+      <td>${fmt(t.weight)}</td>
+      <td>${(t.members||[]).map(x => `${esc(x.member)} (${fmt(x.shareWeight)})`).join(', ')}</td>
+      <td>${subtaskProgressHtml(t)}</td>
+      <td>${statusBadgeHtml(t.status)}</td>
+      <td>
+        ${t.status !== 'Complete' ? `<button class="btn small ghost" onclick="completeTask('${escAttr(t.taskId)}')">Complete</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function completeTask(taskId) {
+  setLoading(true, 'กำลังปิดงาน...', 'กำลังอัปเดต Status และคำนวณ Workload ใหม่');
+  try {
+    const res = await server('updateTaskStatus', taskId, 'Complete');
+    state.dashboard = res.dashboard;
+    state.tasks = res.tasks;
+    state.tasksLoaded = true;
+    renderDashboard();
+    renderTasks();
+    renderTaskUpdateList();
+    toast('อัปเดต Status เป็น Complete สำเร็จ', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+function bindTaskUpdateFilters() {
+  ['updSearch','updStatusFilter','updMemberFilter','updSortFilter'].forEach(id => {
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.id === id) renderTaskUpdateList();
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target && e.target.id === id) renderTaskUpdateList();
+    });
+  });
+}
+
+function renderTaskUpdateFilters() {
+  const memberFilter = document.getElementById('updMemberFilter');
+  const updateMember = document.getElementById('editUpdateMember');
+  if (!memberFilter || !updateMember) return;
+
+  const currentFilter = memberFilter.value;
+  memberFilter.innerHTML = '<option value="">ทั้งหมด</option>' +
+    state.members.map(m => `<option value="${escAttr(m.name)}">${esc(m.name)} (${fmt(m.workStatus)})</option>`).join('');
+  memberFilter.value = currentFilter;
+
+  const currentUpdateMember = updateMember.value;
+  updateMember.innerHTML = '<option value="">ไม่ระบุ</option>' +
+    state.members.map(m => `<option value="${escAttr(m.name)}">${esc(m.name)} (${fmt(m.workStatus)})</option>`).join('');
+  updateMember.value = currentUpdateMember;
+}
+
+function clearUpdateFilters() {
+  document.getElementById('updSearch').value = '';
+  document.getElementById('updStatusFilter').value = '';
+  document.getElementById('updMemberFilter').value = '';
+  document.getElementById('updSortFilter').value = 'activity';
+  renderTaskUpdateList();
+}
+
+function getFilteredTasks() {
+  const q = String(document.getElementById('updSearch')?.value || '').trim().toLowerCase();
+  const status = document.getElementById('updStatusFilter')?.value || '';
+  const member = document.getElementById('updMemberFilter')?.value || '';
+  const sort = document.getElementById('updSortFilter')?.value || 'activity';
+
+  let rows = [...state.tasks];
+  rows = rows.filter(t => {
+    if (status && t.status !== status) return false;
+    if (member && !(t.members || []).some(x => x.member === member)) return false;
+
+    if (q) {
+      const hay = [
+        t.taskId, t.job, t.description, t.holderName, t.status, t.category,
+        (t.members || []).map(x => x.member).join(' '),
+        t.latestUpdate?.note || '', t.latestUpdate?.memberName || ''
+      ].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (sort === 'due') {
+    rows.sort((a,b) => String(a.dueDate || '9999-12-31').localeCompare(String(b.dueDate || '9999-12-31')));
+  } else if (sort === 'weight') {
+    rows.sort((a,b) => Number(b.weight || 0) - Number(a.weight || 0));
+  } else if (sort === 'name') {
+    rows.sort((a,b) => String(a.job || '').localeCompare(String(b.job || ''), 'th'));
+  } else {
+    rows.sort((a,b) => taskActivityKeyClient(b).localeCompare(taskActivityKeyClient(a)));
+  }
+  return rows;
+}
+
+function taskActivityKeyClient(t) {
+  return String(t.latestUpdate?.updateDate || t.latestUpdate?.createdAt || t.updatedAt || t.createdAt || '');
+}
+
+function renderTaskUpdateList() {
+  const body = document.getElementById('taskUpdateListBody');
+  if (!body) return;
+  const rows = getFilteredTasks();
+  document.getElementById('updateFilterCount').textContent = `${rows.length.toLocaleString('th-TH')} / ${state.tasks.length.toLocaleString('th-TH')} งาน`;
+
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="6" class="empty">${state.tasksLoaded ? 'ไม่พบงานตาม Filter' : 'รายการงานจะโหลดเมื่อเปิดเมนูนี้'}</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map((t, index) => {
+    const latest = t.latestUpdate;
+    const note = latest?.note || '-';
+    const date = latest?.updateDate || '-';
+    return `<tr class="task-update-row ${state.selectedTaskId === t.taskId ? 'selected' : ''}" onclick="openTaskEditor('${escAttr(t.taskId)}')">
+      <td class="row-no">${index + 1}</td>
+      <td class="task-title-cell"><strong>${esc(t.job || '(ไม่มีชื่องาน)')}</strong><div class="small-text">${esc(t.taskId)} · Weight ${fmt(t.weight)} · Subtask ${fmt(t.subtaskDone)}/${fmt(t.subtaskCount)}</div></td>
+      <td>${esc((t.members || []).map(x => x.member).join(', ') || '-')}</td>
+      <td>${statusBadgeHtml(t.status)}</td>
+      <td>${esc(t.dueDate || '-')}</td>
+      <td class="latest-note"><strong>${esc(date)}</strong><div class="small-text">${esc(note)}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function openTaskEditor(taskId) {
+  state.selectedTaskId = taskId;
+  renderTaskUpdateList();
+  setLoading(true, 'กำลังโหลดรายละเอียดงาน...', 'กำลังดึงข้อมูลล่าสุด ประวัติ Update และ Subtask');
+  try {
+    const detail = await server('getTaskDetail', taskId);
+    state.selectedTaskDetail = detail;
+    fillTaskEditor(detail);
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function fillTaskEditor(detail) {
+  const t = detail.task;
+  document.getElementById('taskEditorEmpty').style.display = 'none';
+  document.getElementById('taskEditorForm').style.display = 'block';
+  document.getElementById('editTaskTitle').textContent = t.job || 'แก้ไขงาน';
+  document.getElementById('editTaskId').textContent = t.taskId;
+  document.getElementById('editTaskStatusBadge').outerHTML = statusBadgeHtml(t.status, 'editTaskStatusBadge');
+
+  document.getElementById('editJob').value = t.job || '';
+  document.getElementById('editHolder').value = t.holderName || '';
+  document.getElementById('editWeight').value = t.weight ?? 0;
+  state.originalEditDates = {startDate:t.startDate || '', dueDate:t.dueDate || '', deadline:t.deadline || ''};
+  document.getElementById('editStart').value = inputDateValue(t.startDate);
+  document.getElementById('editDue').value = inputDateValue(t.dueDate);
+  document.getElementById('editDeadline').value = inputDateValue(t.deadline);
+  document.getElementById('editStatus').value = t.status || 'Inprocess';
+  document.getElementById('editDescription').value = t.description || '';
+
+  const selected = new Set((t.members || []).map(x => x.member));
+  document.getElementById('editMemberBoxes').innerHTML = state.members.map(m =>
+    `<label class="member-chip ${Number(m.workStatus) === 0 ? 'capacity-zero' : ''}"><input type="checkbox" name="editTaskMember" value="${escAttr(m.name)}" ${selected.has(m.name) ? 'checked' : ''}>${esc(m.name)} <span class="small-text">(${fmt(m.workStatus)})</span></label>`
+  ).join('');
+
+  clearLatestUpdateInput();
+  renderSubtasks(detail.subtasks || []);
+  renderTaskUpdateHistory(detail.updates || []);
+}
+
+function clearLatestUpdateInput() {
+  const dateEl = document.getElementById('editUpdateDate');
+  if (!dateEl) return;
+  dateEl.value = todayIso();
+  document.getElementById('editUpdateMember').value = '';
+  document.getElementById('editProgress').value = '';
+  document.getElementById('editUpdateNote').value = '';
+}
+
+function renderTaskUpdateHistory(updates) {
+  document.getElementById('editUpdateCount').textContent = `${updates.length} รายการ`;
+  const wrap = document.getElementById('taskUpdateHistory');
+  if (!updates.length) {
+    wrap.innerHTML = '<div class="empty">ยังไม่มีประวัติ Update</div>';
+    return;
+  }
+
+  wrap.innerHTML = updates.map((u, index) => {
+    const progress = u.progress === '' || u.progress === null || u.progress === undefined
+      ? '' : `<span>Progress ${fmt(u.progress)}%</span>`;
+    return `<div class="history-item">
+      <div class="history-meta">
+        <span class="row-no-badge">#${index + 1}</span>
+        <strong>${esc(u.updateDate || '-')}</strong>
+        ${u.memberName ? `<span>${esc(u.memberName)}</span>` : ''}
+        ${progress}
+        ${u.createdBy ? `<span>บันทึกโดย ${esc(u.createdBy)}</span>` : ''}
+      </div>
+      <div class="history-note">${esc(u.note || '(ไม่มีรายละเอียด)')}</div>
+    </div>`;
+  }).join('');
+}
+
+async function saveTaskEdit() {
+  if (!state.selectedTaskId) return;
+  const members = [...document.querySelectorAll('input[name="editTaskMember"]:checked')].map(x => x.value);
+  const progressRaw = document.getElementById('editProgress').value;
+  const payload = {
+    taskId: state.selectedTaskId,
+    category: 'Other',
+    job: document.getElementById('editJob').value.trim(),
+    description: document.getElementById('editDescription').value.trim(),
+    holder_name: document.getElementById('editHolder').value.trim(),
+    start_date: editedDateValue('editStart', state.originalEditDates.startDate),
+    due_date: editedDateValue('editDue', state.originalEditDates.dueDate),
+    deadline: editedDateValue('editDeadline', state.originalEditDates.deadline),
+    weight: Number(document.getElementById('editWeight').value || 0),
+    status: document.getElementById('editStatus').value,
+    members,
+    latestUpdate: {
+      updateDate: document.getElementById('editUpdateDate').value || todayIso(),
+      memberName: document.getElementById('editUpdateMember').value,
+      progress: progressRaw === '' ? '' : Number(progressRaw),
+      note: document.getElementById('editUpdateNote').value.trim()
+    }
+  };
+
+  setLoading(true, 'กำลังบันทึกการแก้ไข...', 'กำลังอัปเดตงาน ผู้รับผิดชอบ และข้อมูลล่าสุด');
+  try {
+    const res = await server('updateTask', payload);
+    state.dashboard = res.dashboard;
+    state.tasks = res.tasks || [];
+    state.selectedTaskDetail = res.detail;
+    renderDashboard();
+    renderTasks();
+    renderTaskUpdateList();
+    fillTaskEditor(res.detail);
+    toast('บันทึกการแก้ไขและ Update ล่าสุดสำเร็จ', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function statusBadgeHtml(status, id='') {
+  const s = String(status || '');
+  const cls = s === 'Complete' ? 'good' : s === 'Cancelled' ? 'danger' : s === 'Inprocess' ? 'info' : 'neutral';
+  return `<span ${id ? `id="${id}"` : ''} class="badge ${cls}">${esc(s || '-')}</span>`;
+}
+
+function inputDateValue(v) {
+  const text = String(v || '');
+  const m = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : '';
+}
+
+function editedDateValue(inputId, originalValue) {
+  const current = document.getElementById(inputId).value;
+  if (current) return current;
+  const original = String(originalValue || '');
+  // Preserve legacy text dates such as 04/03/2025 or "ตลอดไป" if the user did not replace them.
+  return inputDateValue(original) ? '' : original;
+}
+
+function todayIso() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+
+function renderConsultMemberOptions() {
+  const filter = document.getElementById('consultMemberFilter');
+  if (filter) {
+    const old = filter.value;
+    filter.innerHTML = '<option value="">ทั้งหมด</option>' + state.members.map(m => `<option value="${escAttr(m.name)}">${esc(m.name)}</option>`).join('');
+    filter.value = old;
+  }
+  const wrap = document.getElementById('consultCountInputs');
+  if (wrap) {
+    wrap.innerHTML = state.members.map(m => `
+      <div class="consult-count-card ${Number(m.workStatus) === 0 ? 'capacity-zero' : ''}">
+        <strong>${esc(m.name)} <span class="small-text">status ${fmt(m.workStatus)} · 1 เรื่อง = 1 weight</span></strong>
+        <input id="consultCount_${escAttr(m.id)}" data-member="${escAttr(m.name)}" type="number" min="0" step="1" value="0">
+      </div>
+    `).join('');
+  }
+}
+
+function fillConsultInputsFromSummary(summary) {
+  document.querySelectorAll('#consultCountInputs input[data-member]').forEach(x => x.value = 0);
+  (summary || []).forEach(x => {
+    const member = state.members.find(m => m.name === x.member);
+    if (member) {
+      const input = document.getElementById(`consultCount_${member.id}`);
+      if (input) input.value = Number(x.count || 0);
+    }
+  });
+}
+
+function renderConsult() {
+  const c = state.consult || {summary:[], entries:[], total:0, activeMembers:0};
+  if (document.getElementById('consultEntryDate') && !document.getElementById('consultEntryDate').value) {
+    document.getElementById('consultEntryDate').value = todayIso();
+  }
+  updateConsultWeekLabel();
+
+  if (document.getElementById('consultStart')) document.getElementById('consultStart').value = c.startDate || '';
+  if (document.getElementById('consultEnd')) document.getElementById('consultEnd').value = c.endDate || '';
+
+  const cards = [
+    ['Consult รวม', fmt(c.total)],
+    ['Weight จาก Consult', fmt(c.total)],
+    ['สมาชิกที่มี Consult', fmt(c.activeMembers)],
+    ['ช่วงข้อมูล', `${formatShortDate(c.startDate)} – ${formatShortDate(c.endDate)}`]
+  ];
+  const cardWrap = document.getElementById('consultCards');
+  if (cardWrap) cardWrap.innerHTML = cards.map(([l,v]) => `<div class="card"><div class="label">${esc(l)}</div><div class="value">${esc(v)}</div></div>`).join('');
+
+  const summary = document.getElementById('consultSummaryBody');
+  if (summary) summary.innerHTML = (c.summary || []).map((x, index) => `<tr><td class="row-no">${index + 1}</td><td><strong>${esc(x.member)}</strong></td><td>${fmt(x.count)}</td></tr>`).join('');
+
+  const history = document.getElementById('consultHistoryBody');
+  if (history) {
+    history.innerHTML = (c.entries || []).length
+      ? c.entries.map((x, index) => {
+          const week = getClientWorkWeek(x.consultDate);
+          return `<tr><td class="row-no">${index + 1}</td><td>${esc(formatShortDate(week.startDate))} – ${esc(formatShortDate(week.endDate))}</td><td>${esc(x.memberName)}</td><td>${fmt(x.count)}</td></tr>`;
+        }).join('')
+      : '<tr><td colspan="4" class="empty">ไม่มีข้อมูลในช่วงนี้</td></tr>';
+  }
+}
+
+async function loadConsultData() {
+  const filters = {
+    startDate: document.getElementById('consultStart').value,
+    endDate: document.getElementById('consultEnd').value,
+    memberName: document.getElementById('consultMemberFilter').value
+  };
+  if (!filters.startDate || !filters.endDate) {
+    toast('กรุณาเลือกช่วงวันที่', 'error'); return;
+  }
+  setLoading(true, 'กำลังโหลด Consult...', 'กำลังสรุปข้อมูลตามช่วงวันที่ที่เลือก');
+  try {
+    state.consult = await server('getConsultData', filters);
+    renderConsult();
+  } catch (err) { toast(err.message, 'error'); }
+  finally { setLoading(false); }
+}
+
+async function setConsultCurrentWeek() {
+  const week = getClientWorkWeek(todayIso());
+  document.getElementById('consultStart').value = week.startDate;
+  document.getElementById('consultEnd').value = week.endDate;
+  document.getElementById('consultEntryDate').value = todayIso();
+  document.getElementById('consultMemberFilter').value = '';
+  updateConsultWeekLabel();
+  await loadConsultData();
+  fillConsultInputsFromSummary(state.consult ? state.consult.summary : []);
+}
+
+function updateConsultWeekLabel() {
+  const input = document.getElementById('consultEntryDate');
+  const label = document.getElementById('consultWeekLabel');
+  if (!input || !label || !input.value) return;
+  const week = getClientWorkWeek(input.value);
+  label.innerHTML = `<span class="dot"></span><span>สัปดาห์ที่บันทึก: <strong>${esc(formatShortDate(week.startDate))} – ${esc(formatShortDate(week.endDate))}</strong> · จันทร์–ศุกร์ · 1 Consult = Weight 1</span>`;
+}
+
+async function loadConsultWeekIntoForm() {
+  const date = document.getElementById('consultEntryDate').value;
+  document.querySelectorAll('#consultCountInputs input[data-member]').forEach(x => x.value = 0);
+  if (!date) return;
+  updateConsultWeekLabel();
+  setLoading(true, 'กำลังโหลด Consult ของสัปดาห์...', 'กำลังดึงยอดรวมรายสมาชิก จันทร์–ศุกร์');
+  try {
+    const weekData = await server('getConsultWeek', date);
+    fillConsultInputsFromSummary(weekData.summary || []);
+  } catch (err) { toast(err.message, 'error'); }
+  finally { setLoading(false); }
+}
+
+async function saveConsultWeek() {
+  const date = document.getElementById('consultEntryDate').value;
+  if (!date) { toast('กรุณาเลือกวันที่ในสัปดาห์', 'error'); return; }
+  const counts = state.members.map(m => ({
+    memberName: m.name,
+    count: Number(document.getElementById(`consultCount_${m.id}`).value || 0)
+  }));
+  if (counts.some(x => x.count < 0 || Math.floor(x.count) !== x.count)) {
+    toast('จำนวน Consult ต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป', 'error'); return;
+  }
+  const week = getClientWorkWeek(date);
+  setLoading(true, 'กำลังบันทึก Consult...', `กำลังอัปเดตยอดสัปดาห์ ${formatShortDate(week.startDate)} – ${formatShortDate(week.endDate)}`);
+  try {
+    const res = await server('saveConsultWeek', {date, counts});
+    state.consult = res.consult;
+    state.dashboard = res.dashboard;
+    renderConsult();
+    renderDashboard();
+    await loadConsultWeekIntoForm();
+    toast('บันทึกยอด Consult รายสัปดาห์สำเร็จ', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+  finally { setLoading(false); }
+}
+
+function getClientWorkWeek(isoDate) {
+  const [y,m,d] = String(isoDate).split('-').map(Number);
+  const date = new Date(y, m - 1, d, 12, 0, 0);
+  const day = date.getDay();
+  const delta = day === 0 ? -6 : 1 - day;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + delta);
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  return {startDate: localIso(monday), endDate: localIso(friday)};
+}
+
+function localIso(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function formatShortDate(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return iso || '-';
+  const [y,m,d] = String(iso).split('-').map(Number);
+  return `${d} ${monthNames[m-1].slice(0,3)} ${y}`;
+}
+
+function subtaskProgressHtml(t) {
+  const total = Number(t.subtaskCount || 0);
+  const done = Number(t.subtaskDone || 0);
+  const pct = Number(t.subtaskProgress || 0);
+  if (!total) return '<span class="small-text">-</span>';
+  return `<div><div class="small-text">${done}/${total} (${fmt(pct)}%)</div><div class="progress-track"><div class="progress-fill" style="width:${Math.max(0,Math.min(100,pct))}%"></div></div></div>`;
+}
+
+function renderSubtasks(items) {
+  const list = document.getElementById('subtaskList');
+  const label = document.getElementById('subtaskProgressLabel');
+  if (!list || !label) return;
+  const total = items.length;
+  const done = items.filter(x => x.status === 'Complete').length;
+  label.textContent = `${done} / ${total} เสร็จ`;
+  if (!total) {
+    list.innerHTML = '<div class="empty">ยังไม่มี Subtask</div>';
+    return;
+  }
+  list.innerHTML = items.map(x => `
+    <div class="subtask-row" data-subtask-id="${escAttr(x.subtaskId)}">
+      <div>
+        <input class="sub-title" value="${escAttr(x.title)}">
+        <input class="sub-desc" value="${escAttr(x.description || '')}" placeholder="รายละเอียดสั้น ๆ" style="margin-top:5px">
+      </div>
+      <input class="sub-due" type="date" value="${escAttr(inputDateValue(x.dueDate))}">
+      <select class="sub-status">
+        ${['not start','Inprocess','Complete','Cancelled'].map(st => `<option ${st===x.status?'selected':''}>${st}</option>`).join('')}
+      </select>
+      <div style="display:flex;gap:6px">
+        <button class="btn small primary" onclick="saveSubtask('${escAttr(x.subtaskId)}')">บันทึก</button>
+        <button class="btn small ghost" onclick="removeSubtask('${escAttr(x.subtaskId)}')">ลบ</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addSubtask() {
+  if (!state.selectedTaskId) return;
+  const payload = {
+    taskId: state.selectedTaskId,
+    title: document.getElementById('newSubtaskTitle').value.trim(),
+    description: document.getElementById('newSubtaskDescription').value.trim(),
+    dueDate: document.getElementById('newSubtaskDue').value,
+    status: document.getElementById('newSubtaskStatus').value
+  };
+  if (!payload.title) { toast('กรุณาใส่ชื่อ Subtask', 'error'); return; }
+  setLoading(true, 'กำลังเพิ่ม Subtask...', 'กำลังบันทึกงานย่อย');
+  try {
+    const res = await server('addSubtask', payload);
+    state.tasks = res.tasks || state.tasks;
+    state.tasksLoaded = true;
+    state.selectedTaskDetail = res.detail;
+    renderTasks(); renderTaskUpdateList(); fillTaskEditor(res.detail);
+    toast('เพิ่ม Subtask สำเร็จ', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+  finally { setLoading(false); }
+}
+
+async function saveSubtask(subtaskId) {
+  const row = [...document.querySelectorAll('.subtask-row')].find(x => x.dataset.subtaskId === subtaskId);
+  if (!row) return;
+  const payload = {
+    subtaskId,
+    title: row.querySelector('.sub-title').value.trim(),
+    description: row.querySelector('.sub-desc').value.trim(),
+    dueDate: row.querySelector('.sub-due').value,
+    status: row.querySelector('.sub-status').value
+  };
+  setLoading(true, 'กำลังบันทึก Subtask...', 'กำลังอัปเดตสถานะและรายละเอียดงานย่อย');
+  try {
+    const res = await server('updateSubtask', payload);
+    state.tasks = res.tasks || state.tasks;
+    state.tasksLoaded = true;
+    state.selectedTaskDetail = res.detail;
+    renderTasks(); renderTaskUpdateList(); fillTaskEditor(res.detail);
+    toast('บันทึก Subtask สำเร็จ', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+  finally { setLoading(false); }
+}
+
+async function removeSubtask(subtaskId) {
+  if (!confirm('ลบ Subtask นี้?')) return;
+  setLoading(true, 'กำลังลบ Subtask...', 'กำลังอัปเดตรายการงานย่อย');
+  try {
+    const res = await server('deleteSubtask', subtaskId);
+    state.tasks = res.tasks || state.tasks;
+    state.tasksLoaded = true;
+    state.selectedTaskDetail = res.detail;
+    renderTasks(); renderTaskUpdateList(); fillTaskEditor(res.detail);
+    toast('ลบ Subtask สำเร็จ', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+  finally { setLoading(false); }
+}
+
+async function generateOtMonth() {
+  const year = Number(document.getElementById('otYear').value);
+  const month = Number(document.getElementById('otMonth').value);
+  setLoading(true, 'กำลังสร้างตาราง OT...', 'กำลังสร้างตารางกะของเดือนที่เลือก');
+  try {
+    state.ot = await server('generateOtMonth', year, month);
+    state.otLoaded = true;
+    state.selectedDate = null;
+    renderOt();
+    toast('สร้างตาราง OT สำเร็จ', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function loadOtMonth(showLoader = true) {
+  const year = Number(document.getElementById('otYear').value);
+  const month = Number(document.getElementById('otMonth').value);
+  if (!year || !month) return;
+
+  if (showLoader) setLoading(true, 'กำลังโหลดข้อมูล OT...', 'กำลังสรุปชั่วโมงและยอด OT ของเดือนที่เลือก');
+  try {
+    state.ot = await server('getOtMonth', year, month);
+    state.otLoaded = true;
+    const today = todayIsoClient();
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    state.selectedDate = today.startsWith(monthKey)
+      ? today
+      : ((state.ot.schedule || [])[0]?.date || null);
+    state.otAdvanced = false;
+    renderOt();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    if (showLoader) setLoading(false);
+  }
+}
+
+function renderOt() {
+  const ot = state.ot || {schedule:[], summary:[], totals:{}};
+  const t = ot.totals || {};
+
+  const cards = [
+    ['ชั่วโมงกะตามแผน', fmt(t.plannedHours)],
+    ['งบตามแผน', money(t.plannedBudget)],
+    ['ชั่วโมงจริงรวมทุกคน', fmt(t.actualHours)],
+    ['ยอดจ่ายจริง', money(t.actualPayout)],
+    ['อัตรา / ชั่วโมง', money(ot.rate || 0)]
+  ];
+  document.getElementById('otCards').innerHTML = cards.map(([l,v]) =>
+    `<div class="card"><div class="label">${esc(l)}</div><div class="value money">${esc(v)}</div></div>`
+  ).join('');
+
+  renderOtCalendar();
+
+  const summaryBody = document.getElementById('otSummaryBody');
+  summaryBody.innerHTML = (ot.summary || []).map((x, index) => `
+    <tr>
+      <td class="row-no">${index + 1}</td>
+      <td><strong>${esc(x.member)}</strong></td>
+      <td>${fmt(x.hours)}</td>
+      <td class="money">${money(x.amount)}</td>
+      <td>${fmt(x.weekdayDays)}</td>
+      <td>${fmt(x.weekendDays)}</td>
+    </tr>
+  `).join('');
+
+  if (state.selectedDate) {
+    const day = (ot.schedule || []).find(x => x.date === state.selectedDate);
+    if (day) fillOtEditor(day);
+  } else {
+    document.getElementById('otEditorEmpty').style.display = 'block';
+    document.getElementById('otEditorForm').style.display = 'none';
+  }
+}
+
+function renderOtCalendar() {
+  const ot = state.ot || {schedule:[]};
+  const cal = document.getElementById('otCalendar');
+  if (!cal) return;
+
+  document.getElementById('otCalendarMonthLabel').textContent =
+    `${monthNames[(ot.month || 1)-1]} ${ot.year || ''}`;
+
+  const headers = ['จ','อ','พ','พฤ','ศ','ส','อา'];
+  let html = headers.map(x => `<div class="ot-weekday">${x}</div>`).join('');
+  const days = ot.schedule || [];
+  if (!days.length) {
+    cal.innerHTML = html + `<div class="empty" style="grid-column:1/-1">ไม่พบข้อมูลเดือนนี้</div>`;
+    return;
+  }
+
+  const first = parseIsoDateClient(days[0].date);
+  // JS: Sun=0; calendar here starts Monday => Monday=0 ... Sunday=6
+  const leading = (first.getDay() + 6) % 7;
+  html += Array.from({length:leading}, () => `<div class="ot-day-blank"></div>`).join('');
+  const today = todayIsoClient();
+
+  html += days.map(day => {
+    const entries = day.entries || [];
+    const actual = entries.reduce((sum,e) => sum + Number(e.hours || 0), 0);
+    const d = parseIsoDateClient(day.date);
+    const dayNum = d.getDate();
+    const dayName = ['อา','จ','อ','พ','พฤ','ศ','ส'][d.getDay()];
+    let statusClass = 'empty';
+    let statusText = 'ยังไม่บันทึก';
+    if (day.active === false) {
+      statusClass = 'off'; statusText = 'ไม่ทำ OT';
+    } else if (entries.length) {
+      statusClass = 'saved'; statusText = `✓ ${entries.length} คน`;
+    } else if (day.saved) {
+      statusText = 'บันทึกกะแล้ว · ยังไม่มีคน';
+    }
+
+    return `<button type="button" class="ot-day-card ${day.isWeekend ? 'weekend' : ''} ${state.selectedDate === day.date ? 'selected' : ''} ${today === day.date ? 'today' : ''}" onclick="selectOtDate('${escAttr(day.date)}')">
+      <div>
+        <div class="ot-day-number">${dayNum}</div>
+        <div class="ot-day-name">${dayName}${day.isWeekend ? ' · Weekend' : ''}</div>
+      </div>
+      <div>
+        <div class="ot-day-status ${statusClass}">${esc(statusText)}</div>
+        <div class="ot-day-hours">${day.active === false ? '-' : `${esc(day.start || '')}–${esc(day.end || '')}`}${entries.length ? ` · ${fmt(actual)} ชม.` : ''}</div>
+      </div>
+    </button>`;
+  }).join('');
+  cal.innerHTML = html;
+}
+
+function selectOtDate(date) {
+  state.selectedDate = date;
+  state.otAdvanced = false;
+  renderOt();
+  if (window.innerWidth < 1100) {
+    setTimeout(() => document.getElementById('otEditor')?.scrollIntoView({behavior:'smooth', block:'start'}), 30);
+  }
+}
+
+function fillOtEditor(day) {
+  document.getElementById('otEditorEmpty').style.display = 'none';
+  document.getElementById('otEditorForm').style.display = 'block';
+  document.getElementById('otSelectedDate').textContent = formatDateLabel(day.date);
+  document.getElementById('otSelectedDayType').textContent = day.isWeekend ? 'วันหยุด / Weekend' : 'วันธรรมดา';
+  const badge = document.getElementById('otSavedBadge');
+  if (day.active === false) {
+    badge.className = 'badge warn'; badge.textContent = 'ไม่ทำ OT';
+  } else if ((day.entries || []).length) {
+    badge.className = 'badge good'; badge.textContent = `บันทึกแล้ว ${(day.entries || []).length} คน`;
+  } else {
+    badge.className = 'badge neutral'; badge.textContent = day.saved ? 'บันทึกกะแล้ว' : 'ยังไม่บันทึก';
+  }
+
+  document.getElementById('schStart').value = cleanTimeClient(day.start || '');
+  document.getElementById('schEnd').value = cleanTimeClient(day.end || '');
+  document.getElementById('schBreak').value = day.breakHours ?? 0;
+  document.getElementById('schActive').value = String(day.active !== false);
+  document.getElementById('schNote').value = day.note || '';
+
+  const existing = day.entries || [];
+  const differs = existing.some(e =>
+    cleanTimeClient(e.start) !== cleanTimeClient(day.start) ||
+    cleanTimeClient(e.end) !== cleanTimeClient(day.end) ||
+    Number(e.breakHours || 0) !== Number(day.breakHours || 0)
+  );
+  state.otAdvanced = state.otAdvanced || differs;
+  document.getElementById('otAdvancedToggle').checked = state.otAdvanced;
+
+  const existingMap = {};
+  existing.forEach(e => existingMap[e.member] = e);
+
+  document.getElementById('otMemberRows').innerHTML = state.members.map(m => {
+    const e = existingMap[m.name];
+    const selectedRoles = e ? String(e.roles || '').split(',').map(x => x.trim()).filter(Boolean) : [];
+    const enabled = !!e;
+    const personStart = cleanTimeClient(e ? e.start : day.start);
+    const personEnd = cleanTimeClient(e ? e.end : day.end);
+    const personBreak = e ? Number(e.breakHours || 0) : Number(day.breakHours || 0);
+    return `<div class="ot-person-card ${enabled ? 'selected' : ''}" data-member="${escAttr(m.name)}">
+      <label class="ot-person-main">
+        <input class="ot-enabled" type="checkbox" ${enabled ? 'checked' : ''} onchange="toggleOtPerson(this)">
+        <span class="ot-person-name">${esc(m.name)}</span>
+        <span class="ot-person-time">${enabled && e ? `${fmt(e.hours)} ชม.` : 'ใช้เวลากะหลัก'}</span>
+      </label>
+      <div class="ot-role-wrap">
+        ${roleOptions.map(r => `<label class="ot-role-chip"><input class="ot-role" type="checkbox" value="${escAttr(r)}" ${selectedRoles.includes(r) ? 'checked' : ''}>${esc(r)}</label>`).join('')}
+      </div>
+      <div class="ot-person-advanced ${state.otAdvanced ? 'show' : ''}">
+        <div class="field"><label>เริ่ม</label><input class="ot-start" type="time" value="${escAttr(personStart)}"></div>
+        <div class="field"><label>สิ้นสุด</label><input class="ot-end" type="time" value="${escAttr(personEnd)}"></div>
+        <div class="field"><label>พัก</label><input class="ot-break" type="number" min="0" step="0.5" value="${escAttr(personBreak)}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateOtSelectedCount();
+  updateOtShiftSummary();
+  highlightOtPreset(day);
+}
+
+function applyOtPreset(type) {
+  const s = state.settings || {};
+  if (type === 'weekday') {
+    document.getElementById('schStart').value = cleanTimeClient(s.WEEKDAY_START || '16:00');
+    document.getElementById('schEnd').value = cleanTimeClient(s.WEEKDAY_END || '18:00');
+    document.getElementById('schBreak').value = Number(s.WEEKDAY_BREAK || 0);
+    document.getElementById('schActive').value = 'true';
+  } else if (type === 'weekend') {
+    document.getElementById('schStart').value = cleanTimeClient(s.WEEKEND_START || '08:00');
+    document.getElementById('schEnd').value = cleanTimeClient(s.WEEKEND_END || '16:00');
+    document.getElementById('schBreak').value = Number(s.WEEKEND_BREAK || 1);
+    document.getElementById('schActive').value = 'true';
+  } else if (type === 'off') {
+    document.getElementById('schActive').value = 'false';
+    selectAllOtMembers(false);
+  }
+  if (type !== 'off' && state.otAdvanced) copyShiftToSelected();
+  updateOtShiftSummary();
+  highlightOtPreset();
+}
+
+function highlightOtPreset() {
+  const start = document.getElementById('schStart').value;
+  const end = document.getElementById('schEnd').value;
+  const brk = Number(document.getElementById('schBreak').value || 0);
+  const active = document.getElementById('schActive').value !== 'false';
+  const s = state.settings || {};
+  const weekday = active && start === cleanTimeClient(s.WEEKDAY_START || '16:00') && end === cleanTimeClient(s.WEEKDAY_END || '18:00') && brk === Number(s.WEEKDAY_BREAK || 0);
+  const weekend = active && start === cleanTimeClient(s.WEEKEND_START || '08:00') && end === cleanTimeClient(s.WEEKEND_END || '16:00') && brk === Number(s.WEEKEND_BREAK || 1);
+  document.getElementById('presetWeekday').classList.toggle('active', weekday);
+  document.getElementById('presetWeekend').classList.toggle('active', weekend);
+  document.getElementById('presetOff').classList.toggle('active', !active);
+}
+
+function onOtShiftChanged() {
+  document.getElementById('schActive').value = 'true';
+  updateOtShiftSummary();
+  highlightOtPreset();
+}
+
+function updateOtShiftSummary() {
+  const start = document.getElementById('schStart').value;
+  const end = document.getElementById('schEnd').value;
+  const brk = Number(document.getElementById('schBreak').value || 0);
+  const active = document.getElementById('schActive').value !== 'false';
+  const hours = active ? calcHoursClient(start, end, brk) : 0;
+  document.getElementById('otShiftSummary').textContent = active
+    ? `กะหลัก ${start || '--:--'}–${end || '--:--'} · หักพัก ${brk} ชม. · รวม ${fmt(hours)} ชม./คน`
+    : 'วันนี้ตั้งเป็น “ไม่ทำ OT”';
+}
+
+function toggleOtPerson(input) {
+  input.closest('.ot-person-card')?.classList.toggle('selected', input.checked);
+  updateOtSelectedCount();
+}
+
+function selectAllOtMembers(checked) {
+  document.querySelectorAll('.ot-person-card').forEach(card => {
+    const cb = card.querySelector('.ot-enabled');
+    cb.checked = !!checked;
+    card.classList.toggle('selected', !!checked);
+  });
+  updateOtSelectedCount();
+}
+
+function updateOtSelectedCount() {
+  const n = document.querySelectorAll('.ot-enabled:checked').length;
+  const el = document.getElementById('otSelectedCount');
+  if (el) el.textContent = `เลือกแล้ว ${n} คน`;
+}
+
+function toggleOtAdvanced(show) {
+  state.otAdvanced = !!show;
+  document.querySelectorAll('.ot-person-advanced').forEach(x => x.classList.toggle('show', state.otAdvanced));
+  if (state.otAdvanced) copyShiftToSelected(false);
+}
+
+function copyShiftToSelected(onlySelected=true) {
+  const start = document.getElementById('schStart').value;
+  const end = document.getElementById('schEnd').value;
+  const brk = document.getElementById('schBreak').value;
+  document.querySelectorAll('.ot-person-card').forEach(card => {
+    if (onlySelected && !card.querySelector('.ot-enabled').checked) return;
+    card.querySelector('.ot-start').value = start;
+    card.querySelector('.ot-end').value = end;
+    card.querySelector('.ot-break').value = brk;
+  });
+}
+
+async function saveOtDay() {
+  if (!state.selectedDate) return;
+
+  const active = document.getElementById('schActive').value !== 'false';
+  const shiftStart = document.getElementById('schStart').value;
+  const shiftEnd = document.getElementById('schEnd').value;
+  const shiftBreak = Number(document.getElementById('schBreak').value || 0);
+  const entries = [];
+
+  document.querySelectorAll('.ot-person-card').forEach(card => {
+    if (!card.querySelector('.ot-enabled').checked || !active) return;
+    const roles = [...card.querySelectorAll('.ot-role:checked')].map(x => x.value);
+    entries.push({
+      member: card.dataset.member,
+      start: state.otAdvanced ? card.querySelector('.ot-start').value : shiftStart,
+      end: state.otAdvanced ? card.querySelector('.ot-end').value : shiftEnd,
+      breakHours: state.otAdvanced ? Number(card.querySelector('.ot-break').value || 0) : shiftBreak,
+      roles
+    });
+  });
+
+  if (active && entries.length && (!shiftStart || !shiftEnd)) {
+    toast('กรุณาระบุเวลาเริ่มและเวลาสิ้นสุดของกะ', 'error');
+    return;
+  }
+
+  const payload = {
+    date: state.selectedDate,
+    schedule: {
+      start: shiftStart,
+      end: shiftEnd,
+      breakHours: shiftBreak,
+      active,
+      note: document.getElementById('schNote').value.trim()
+    },
+    entries
+  };
+
+  setLoading(true, 'กำลังบันทึก OT...', `กำลังบันทึก ${formatDateLabel(state.selectedDate)} · ${entries.length} คน`);
+  try {
+    const res = await server('saveOtDay', payload);
+    state.ot = res.monthData;
+    state.otLoaded = true;
+    state.otAdvanced = false;
+    renderOt();
+    toast(active ? `บันทึก OT สำเร็จ ${entries.length} คน` : 'บันทึกว่าไม่ทำ OT วันนี้แล้ว', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function todayIsoClient() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseIsoDateClient(value) {
+  const clean = String(value || '').match(/\d{4}-\d{2}-\d{2}/)?.[0] || String(value || '').slice(0,10);
+  const [y,m,d] = clean.split('-').map(Number);
+  return new Date(y, (m || 1)-1, d || 1);
+}
+
+function cleanTimeClient(value) {
+  const m = String(value || '').match(/(\d{1,2}):(\d{2})/);
+  return m ? `${String(Number(m[1])).padStart(2,'0')}:${m[2]}` : '';
+}
+
+function calcHoursClient(start, end, breakHours=0) {
+  if (!start || !end) return 0;
+  const [sh,sm] = start.split(':').map(Number);
+  const [eh,em] = end.split(':').map(Number);
+  const mins = (eh*60+em) - (sh*60+sm);
+  return Math.max(0, Math.round(((mins/60)-Number(breakHours||0))*100)/100);
+}
+
+function renderAudit() {
+  const body = document.getElementById('auditBody');
+  if (!(state.audit || []).length) {
+    body.innerHTML = `<tr><td colspan="6" class="empty">${state.auditLoaded ? 'ยังไม่มี Audit Log' : 'Audit Log จะโหลดเมื่อเปิดเมนูนี้'}</td></tr>`;
+    return;
+  }
+  body.innerHTML = (state.audit || []).map((x, index) => `
+    <tr>
+      <td class="row-no">${index + 1}</td>
+      <td>${esc(x.timestamp)}</td>
+      <td>${esc(x.user)}</td>
+      <td>${esc(x.action)}</td>
+      <td>${esc(x.module)}</td>
+      <td>${esc(x.recordId)}</td>
+    </tr>
+  `).join('');
+}
+
+function setLoading(on, title='กำลังดำเนินการ...', subtitle='กรุณาอย่าปิดหน้านี้จนกว่าจะเสร็จ') {
+  const root = document.getElementById('appRoot');
+  const overlay = document.getElementById('loadingOverlay');
+  const titleEl = document.getElementById('loadingTitle');
+  const subtitleEl = document.getElementById('loadingSubtitle');
+
+  root.classList.toggle('loading', !!on);
+  overlay.classList.toggle('show', !!on);
+  if (on) {
+    titleEl.textContent = title;
+    subtitleEl.textContent = subtitle || '';
+  }
+}
+
+function toast(message, type='success', title='') {
+  // Backward compatibility with old toast(message, true/false).
+  if (typeof type === 'boolean') type = type ? 'error' : 'success';
+  if (!['success','error','info'].includes(type)) type = 'info';
+
+  const el = document.getElementById('toast');
+  const iconEl = document.getElementById('toastIcon');
+  const titleEl = document.getElementById('toastTitle');
+  const messageEl = document.getElementById('toastMessage');
+  const config = {
+    success: {icon:'✓', title:'บันทึกสำเร็จ'},
+    error: {icon:'!', title:'ดำเนินการไม่สำเร็จ'},
+    info: {icon:'i', title:'แจ้งเตือน'}
+  }[type];
+
+  iconEl.textContent = config.icon;
+  titleEl.textContent = title || config.title;
+  messageEl.textContent = message || '';
+  el.className = `toast ${type} show`;
+
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(() => {
+    el.classList.remove('show');
+  }, type === 'error' ? 6000 : 3600);
+}
+
+function fmt(v) {
+  const n = Number(v || 0);
+  return n.toLocaleString('th-TH', {maximumFractionDigits:2});
+}
+function money(v) {
+  const n = Number(v || 0);
+  return n.toLocaleString('th-TH', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' ฿';
+}
+function signed(v) {
+  const n = Number(v || 0);
+  return `${n > 0 ? '+' : ''}${fmt(n)}`;
+}
+function formatDateLabel(iso) {
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  return `${d} ${monthNames[m-1]} ${y}`;
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escAttr(s) { return esc(s); }
+</script>
+</body>
+</html>
